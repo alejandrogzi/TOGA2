@@ -1,5 +1,6 @@
 """Class holding all project-wide constants."""
 
+from logging import Formatter
 from typing import Dict, List, Tuple
 
 import os
@@ -80,11 +81,11 @@ class Constants:
     ALL_LOSS_SYMBOLS: Tuple[str] = ('FI', 'I', 'PI', 'UL', 'M', 'L', 'PG', 'PP', 'N')
     DEFAULT_LOSS_SYMBOLS: Tuple[str] = ('FI', 'I', 'PI', 'UL')
 
-    # FORMATTER: Formatter = Formatter(
-    #     '[{asctime}][{filename}] - {levelname}: {message}',
-    #     style='{',
-    #     datefmt='%Y-%m-%d %H:%M:%S',
-    # )
+    FORMATTER: Formatter = Formatter(
+        '[{asctime}][{filename}] - {levelname}: {message}',
+        style='{',
+        datefmt='%Y-%m-%d %H:%M:%S',
+    )
 
     RESUME_OPTIONS: List[str] = [
         'all', 'setup', 'feature_extraction', 'classification', 
