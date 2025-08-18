@@ -5,7 +5,7 @@ Shared functionality across the scripts
 """
 
 from click_option_group import OptionGroup
-from .constants import Constants
+from constants import Constants
 from datetime import datetime
 from shutil import copy2, rmtree
 from typing import (
