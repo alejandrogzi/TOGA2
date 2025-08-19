@@ -6,7 +6,7 @@ __pycache__/
 # temporary, legacy, and lab-internal code
 _toga2.py
 patch_scripts/
-extra/
+/extra/
 src/python/modules/final_orthology_aggregator_old.py
 
 # compiled Rust code
