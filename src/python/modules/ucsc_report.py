@@ -2,13 +2,13 @@
 A collection of constants and executables related to UCSC BigBed report formatting
 """
 
-from cesar_wrapper_executables import Mutation
-from cesar_wrapper_constants import (
+from modules.cesar_wrapper_executables import Mutation
+from modules.cesar_wrapper_constants import (
     FS_INDELS, COMPENSATION, DEL_MISS, DEL_EXON, MISS_EXON, SSM
 )
 from collections import defaultdict
 from dataclasses import dataclass ## TODO: HIGHLY REDUNDANT
-from .shared import parts
+from modules.shared import parts
 from typing import Any, Dict, Iterable, List, Optional, Set, TextIO, Tuple 
 
 __author__ = 'Yury V. Malovichko'

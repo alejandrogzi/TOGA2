@@ -6,18 +6,17 @@ from _io import TextIOWrapper
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
-from .cesar_wrapper_constants import (
+from modules.cesar_wrapper_constants import (
     AA_CODE, ACCEPTOR_SITE, A_T_BLOSUM, A_T_PID, 
     DEL_PEN, DONOR_SITE, FLANK_SPACE, GAP_CODON, 
     HQ_BLOSUM, HQ_PID, INS_PEN, LO_T_BLOSUM, LO_T_PID, 
     MAX_CHAIN_GAP_SIZE, MIN_INTRON_LENGTH, NNN_CODON, 
     SS_SIZE, STOPS, XXX_CODON 
 )
-from .shared import (
+from modules.shared import (
     chain_extract_id, flatten, intersection, nn, 
     reverse_complement, parts
 )
-from string_splitter import split_at_
 from sys import stderr
 from typing import Any, Dict, Iterable, List, Set, TextIO, Tuple, Union
 
@@ -1840,15 +1839,11 @@ def get_exons(
     gene_borders = {_all_positions[0], _all_positions[-1]}
     # extract sequences
     exon_seqs: Dict[int, str] = {}  # exon number: sequence dict
-    chrom: str = annot.chrom
-    # if chrom not in chrom_seq:
-    #     raise KeyError(f"Error! Cannot find chrom {chrom} in 2bit file {twobit}")
-    # click.echo("\nExons sequences ####\n")
+    # chrom: str = annot.chrom
     phase: int = 0
     for num, pos in exons_pos.items():
         is_first_exon = num == 1
         is_last_exon = num == max_exon_num
-
         # for twoBitToFa start must be < end
         # determine search start and end
         # do not subtract/add SS_SIZE if gene border: no splice sites then
@@ -2125,189 +2120,6 @@ def add_exon_headers(
         names[exon] = name
     return names
 
-
-def transcriptwise_subchains(
-    chain: str, tr2coords: Dict[str, Tuple[int, int]]
-) -> List[Tuple[int]]:
-    """
-    Converts a string-like alignment representation into a list
-    of coordinate tuples in the (ref_start, ref_end, query_start, query_end).
-    All blocks are sorted and numbered according to the referenve coordinates.
-    Chain gaps are introduced as similar tuples named after flanking blocks
-    """
-    ####### TODO: NEEDS TESTING FOR FUNCTIONALITY, COMPATIBILITY, AND PERFORMANCE SPEED
-    sorted_blocks: List[Tuple[int]] = []
-    tr2blocks: Dict[str, Dict[str, Tuple[int]]] = defaultdict(dict)
-    ## split chain string into separate lines
-    # split_chain: List[str] = chain.split('\n')
-    # init1 = datetime.now()
-    # split_chain = chain.split('\n')
-    # stderr.write(f'Pythonic chain splitting time: {str(datetime.now() - init1)}\n')
-    init1 = datetime.now()
-    split_chain: Iterable[str] = split_at_(chain, '\n')
-    stderr.write(f'Cythonic chain splitting time: {str(datetime.now() - init1)}\n')
-    ## extract all the necessary data from the chain header
-    # chain_header: List[str] = split_chain[0].split()
-    chain_header: List[str] = next(split_chain).split()
-    ref_chr: str = chain_header[2]
-    ref_chr_size: int = int(chain_header[3])
-    ref_strand: bool = chain_header[4] == '+'
-    ref_start: int = int(chain_header[5])
-    ref_end: int = int(chain_header[6])
-    if not ref_strand:
-        t_chain_start: int = ref_chr_size - ref_end
-        t_chain_stop: int = ref_chr_size - ref_start
-        ref_start = ref_chr_size - ref_start
-        ref_end = ref_chr_size - ref_end
-    else:
-        t_chain_start, t_chain_stop = ref_start, ref_end
-    query_chr: str = chain_header[7]
-    query_chr_size: int = int(chain_header[8])
-    query_strand: bool = chain_header[9] == '+'
-    query_start: int = int(chain_header[10])
-    query_end: int = int(chain_header[11])
-    if not query_strand:
-        query_start = query_chr_size - query_start
-        query_end = query_chr_size - query_end
-    chain_meta: Tuple[int] = (
-        ref_chr, query_chr, t_chain_start, t_chain_stop, ref_strand, query_strand
-    )
-    ## sort the transcripts
-    sorted_transcripts: Tuple[str] = tuple(
-        sorted(
-            (k for k in tr2coords), key=lambda x: tr2coords[x][:2]
-        ) ## sort by coordinates
-    )
-    abs_start: int = sorted(tr2coords[sorted_transcripts[0]])[0]
-    abs_stop: int = sorted(tr2coords[sorted_transcripts[-1]])[1]
-    curr_tr: int = 0
-    # b_num: int = 1 if ref_strand else len(split_chain) - 1
-    b_num: int = 1
-    gap_num: str = ''
-    gap_coord_tuple: Tuple[int] = (0,0,0,0)
-    r_start: int = ref_start
-    q_start: int = query_start
-    last_tr: str = sorted_transcripts[-1]
-
-    for i, block in enumerate(split_chain):
-        # print(f'{block=}')
-        if not block:
-            break
-        if '\t' in block:
-            size, dt, dq = map(int, block.split('\t'))
-        else:
-            size, dt, dq = int(block), 0, 0
-        r_end: int = r_start + size * (1 if ref_strand else -1)
-        q_end: int = q_start + size * (1 if query_strand else -1)
-        coord_tuple: Tuple[int] = (
-            *sorted((r_start, r_end)), *sorted((q_start, q_end))
-        )
-        ## reset the current start values
-        r_start = r_end
-        q_start = q_end
-        ## first, check if the block intersects the transcript array
-        up_block: bool = coord_tuple[1] < abs_start
-        down_block: bool = coord_tuple[0] > abs_stop
-
-        ## if iterator has not reached the first transcript's search space,
-        ## there is no need to check for further intersections;
-        ## however, in order to ensure that every transcript has a space to align,
-        ## create a provisional gap object
-        if (ref_strand and up_block) or (not ref_strand and down_block):
-            r_end = r_start + dt * (1 if ref_strand else -1)
-            q_end = q_start + dq * (1 if query_strand else -1)
-            # if not gap_coord_tuple:
-            gap_num = '0_0'
-            gap_coord_tuple = (r_start, r_end, q_start, q_end)
-            r_start = r_end
-            q_start = q_end
-            continue
-        ## if iterator goes past the last transcript's locus, the process halts;
-        ## however, for trans
-        if ((ref_strand and down_block) or (not ref_strand and up_block)):
-            print('The loop has passed the last transcript; skipping')
-            discard_next_block: bool = True
-            for tr in sorted_transcripts[curr_tr:]:
-                if gap_num in tr2blocks[tr] and b_num not in tr2blocks[tr]:
-                    discard_next_block = False
-                    break
-            if discard_next_block:
-                for tr in sorted_transcripts[curr_tr:]:
-                    if not tr2blocks[tr]:
-                        tr2blocks[tr][gap_num] = gap_coord_tuple
-                break
-        ## check if the block intersects any of the transcripts
-        for tr_num, tr in enumerate(sorted_transcripts[curr_tr:], start=curr_tr):
-            tr_start, tr_end = sorted(tr2coords[tr])
-            # print(f'{tr=}, {tr_start=}, {tr_end=}, {tr_end-tr_start=}')
-            if ref_strand:
-                if tr_end < coord_tuple[0]:
-                    ## the transcript lies upstream to the aligned block;
-                    ## update the transcript pointer and proceed further
-                    curr_tr += 1
-                    # print(f'{gap_num=}, {tr2blocks[tr]=}, {gap_num in tr2coords[tr]=}')
-                    if gap_num and gap_num in tr2blocks[tr]:
-                        tr2blocks[tr][str(b_num)] = coord_tuple
-                    if not tr2blocks[tr]:
-                        tr2blocks[tr][gap_num] = gap_coord_tuple
-                    # print(f'Incrementing current transcript number after {tr}')
-                    continue
-                if tr_start >= coord_tuple[1]:
-                    ## somehow the transcript iterator moved downstream
-                    ## to the current block; as long as transcripts are
-                    ## sorted properly, there is no need to check the remaining
-                    ## transcripts
-                    # print(f'Breaking at block {b_num} for transcript {tr}, positive strand')
-                    break
-            else:
-                ## logic is essentially the same except for now the iterator
-                ## goes upstream along the chromosome
-                if tr_start >= coord_tuple[1]:
-                    curr_tr += 1
-                    continue
-                if tr_end < coord_tuple[0]:
-                    # print(f'Breaking at block {b_num}, negative strand')
-                    break
-            tr2blocks[tr][str(b_num)] = coord_tuple
-        if curr_tr >= len(sorted_transcripts):
-            break
-        ## if this is the last block, there is no chain gap to follow
-        # if i == len(split_chain) - 1:
-        #     break
-        ## otherwise, create a gap block
-        gap_num: str = f'{b_num}_{b_num+1}' if ref_strand else f'{b_num-1}_{b_num}'
-        r_end: int = r_start + dt * (1 if ref_strand else -1)
-        q_end: int = q_start + dq * (1 if query_strand else -1)
-        gap_coord_tuple: Tuple[int] = (r_start, r_end, q_start, q_end)
-        ## and do the same trick
-        for tr_num, tr in enumerate(sorted_transcripts[curr_tr:], start=curr_tr):
-            tr_start, tr_end = tr2coords[tr]
-            if ref_strand:
-                if tr_end < gap_coord_tuple[0]:
-                    curr_tr += 1
-                    continue
-                # if tr_start >= gap_coord_tuple[1]:
-                #     print(f'Breaking at gap {gap_num}, positive strand')
-                #     break
-            else:
-                if tr_start >= coord_tuple[1]:
-                    curr_tr += 1
-                    continue
-                # if tr_end < coord_tuple[0]:
-                #     print(f'Breaking at gap {gap_num}, negative strand')
-                #     break
-            tr2blocks[tr][gap_num] = gap_coord_tuple
-            if b_num not in tr2blocks[tr]:
-                tr2blocks[tr][str(b_num)] = coord_tuple
-        r_start = r_end
-        q_start = q_end
-        if curr_tr >= len(sorted_transcripts):
-            # print(f'Breaking the outer loop at block {b_num}')
-            if gap_num in tr2blocks[tr]:
-                tr2blocks[tr][b_num] = coord_tuple
-            break
-        b_num += 1# if ref_strand else -1
-    return tr2blocks, chain_meta
 
 def intersect_exons_to_blocks( ## TODO: clearly must be moved to Exon2BlockMapper methods
     exons: Dict[int, Exon],
