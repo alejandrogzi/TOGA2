@@ -11,12 +11,6 @@ from typing import Dict, List, Optional, TextIO
 
 import click
 import h5py
-import os
-import sys
-
-LOCATION: str = os.path.dirname(os.path.abspath(__file__))
-PARENT: str = os.sep.join(LOCATION.split(os.sep)[:-1])
-sys.path.extend([LOCATION, PARENT])
 
 HEADER_START: str = '>'
 REFERENCE: str = 'REFERENCE'
