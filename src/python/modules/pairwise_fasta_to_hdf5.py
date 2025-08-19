@@ -5,7 +5,7 @@ Converts pairwise FASTA file into an HDF5 storage
 """
 
 from collections import defaultdict
-from .shared import CommandLineManager, CONTEXT_SETTINGS
+from shared import CommandLineManager, CONTEXT_SETTINGS
 from numpy import bytes_
 from typing import Dict, List, Optional, TextIO
 
