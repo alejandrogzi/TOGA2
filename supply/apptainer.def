@@ -13,11 +13,8 @@ Stage: build
         curl \
         openjdk-17-jdk \
         git \
-        postfix \
         bsd-mailx \
-        nullmailer \
         mailutils \
-        exim4 \
         && rm -rf /var/lib/apt/lists/*
 
     update-exim4.conf 

@@ -6,17 +6,25 @@ from _io import TextIOWrapper
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
-from .cesar_wrapper_constants import *
-from .shared import (
-    CONTEXT_SETTINGS, intersection, nn, reverse_complement, 
-    chain_extract_id, parts
+from cesar_wrapper_constants import (
+    AA_CODE, ACCEPTOR_SITE, A_T_BLOSUM, A_T_PID, 
+    DEL_PEN, DONOR_SITE, FLANK_SPACE, GAP_CODON, 
+    HQ_BLOSUM, HQ_PID, INS_PEN, LO_T_BLOSUM, LO_T_PID, 
+    MAX_CHAIN_GAP_SIZE, MIN_INTRON_LENGTH, NNN_CODON, 
+    SS_SIZE, STOPS, XXX_CODON 
 )
+from .shared import (
+    chain_extract_id, flatten, intersection, nn, 
+    reverse_complement, parts
+)
+from string_splitter import split_at_
 from sys import stderr
 from typing import Any, Dict, Iterable, List, Set, TextIO, Tuple, Union
 
 import click
 import ctypes
 import os
+import subprocess
 import sys
 
 
@@ -440,17 +448,18 @@ class ProjectionGroup:
         present and contradicting each other, selects the more reliable evidence
         source
         """
+        ## TODO: Obsolete
         if not self.discordant_cases:
             return
         click.echo('Analysing the discordant cases')
         min_exon: int = min(
             list(filter(
-                lambda x: x not in discordant_cases, self.exon_coords.keys())
+                lambda x: x not in self.discordant_cases, self.exon_coords.keys())
             )
         )
         max_exon: int = max(
             list(filter(
-                lambda x: x not in discordant_cases, self.exon_coords.keys())
+                lambda x: x not in self.discordant_cases, self.exon_coords.keys())
             )
         )
         draft_start: int = (
@@ -461,8 +470,8 @@ class ProjectionGroup:
             self.exon_coords[max_exon][1] if self.strand \
             else self.exon_coords[min_exon][1]
         )
-        for d in sorted(discordant_cases):
-            ref_exon: Exon = self.annot.exons[d]
+        for d in sorted(self.discordant_cases):
+            # ref_exon: Exon = self.annot.exons[d]
             segment_exon: Exon = self.segment.exons[d]
             chain_block: Tuple[int, int] = self.mapper.get_exon_coords(d)[2:]
             segment_inter: int = intersection(
@@ -1277,72 +1286,6 @@ def all_projection_exons(
         output.extend(list(segment.exons.keys()))
     return output
 
-## OBSOLETE
-# @dataclass
-# class CesarInput:
-#     __slots__ = [
-#         'input_str', 'projection', 'group', 'chain', 'exons', 'memory',
-#         'chrom', 'start', 'stop', 'strand', 'asmbl_gaps', 'was_not_aligned',
-#         'evidence', 'contains_max'
-#     ]
-#
-#     input_str: str
-#     projection: str
-#     group: int
-#     exons: List[int]
-#     memory: float
-#     chain: str
-#     chrom: str
-#     start: int
-#     stop: int
-#     strand: bool
-#     asmbl_gaps: List[Tuple[int]]
-#     was_not_aligned: bool
-#     evidence: Dict[int, int]
-#     contains_max: bool
-
-## OBSOLETE
-# def table_to_cesar_group(table: Iterable[Iterable[str]], min_gap_size: int = 10) -> Dict[int, Dict[int, str]]:
-#     """
-#     Given the NumPy record of the transcript preprocessing,
-#     return the restored CESAR input
-#     """
-#     out_dict: Dict[int, Dict[int, str]] = defaultdict(dict)
-#     num_group: int = 0
-#     for i in range(table.shape[0]):
-#         line: List[str] = [x.decode('utf-8') for x in table[i]]
-#         print(line)
-#         input_str: str = ''
-#         tr, chain, group, exons, mem, chrom, start, stop, strand = line[:9]
-#         group: int = int(group)
-#         exons: List[int] = [int(x) for x in exons.split(',')]
-#         mem: float = float(mem)
-#         start, stop = int(start), int(stop)
-#         strand: bool = bool(int(strand))
-#         exon_headers: List[str] = line[9].split('|')
-#         exon_seqs: List[str] = line[10].split('|')
-#         if len(exon_headers) != len(exon_seqs):
-#             raise Exception(
-#                 'CESAR input data is likely corrupted; unequal number of exon '
-#                 f'headers and sequences for group {group} at line {i}'
-#             )
-#         for j in range(len(exon_headers)):
-#             input_str += f'{exon_headers[j]}\n{exon_seqs[j]}\n'
-#         space_header, space_seq = line[11:13]
-#         input_str += f'####\n{space_header}\n{space_seq}'
-#         was_not_aligned: bool = bool(int(line[13]))
-#         evidence: Dict[int, int] = dict([map(int, x.split('|')) for x in line[14].split(',')])
-#         contains_max: bool = bool(int(line[15]))
-#         gaps: List[Tuple[int]] = find_gaps(
-#             space_seq, min_gap_size, start if strand else stop, strand, chrom
-#         )
-#         out_dict[tr][num_group] = CesarInput(
-#             input_str, tr, num_group, exons, mem, chain,
-#             chrom, start, stop, strand, gaps, was_not_aligned, evidence, contains_max
-#         )
-#         num_group += 1
-#
-#     return out_dict
 
 @dataclass
 class CesarInput:
@@ -1407,7 +1350,7 @@ def table_to_cesar_group(table: Iterable[Iterable[str]]) -> Dict[int, Dict[int, 
         if len(exon_names) != len(exon_seqs):
             raise Exception(
                 'CESAR input data is likely corrupted; unequal number of exon '
-                f'headers and sequences for group {group} at line {i}'
+                f'headers and sequences for group {exon_group} at line {i}'
             )
         for x in zip(exon_names, exon_seqs):
             input_str += '\n'.join(x) + '\n'
@@ -1530,7 +1473,7 @@ def a_table_to_cesar_group(table: Iterable[Iterable[str]]) -> Dict[int, Dict[int
         if len(exon_names) != len(exon_seqs):
             raise Exception(
                 'CESAR input data is likely corrupted; unequal number of exon '
-                f'headers and sequences for group {group} at line {i}'
+                f'headers and sequences for group {exon_group} at line {i}'
             )
         for x in zip(exon_names, exon_seqs):
             input_str += '\n'.join(x) + '\n'
@@ -1769,6 +1712,8 @@ def parse_extr_exon_fasta(raw_fasta: str) -> Dict[str, Dict[int, str]]:
     output_dict: Dict[str, Dict[int, str]] = defaultdict(dict)
     has_entry: bool = False
     curr_seq: str = ''
+    transcript: str = ''
+    exon: str = ''
     for line in raw_fasta.split('\n'):
         if not line:
             continue
@@ -1914,8 +1859,8 @@ def get_exons(
         # get exon 10 bp flanks:
         left_brd_: int = max(min_pos - exon_flank, 0)
         right_brd_: int = min(max_pos + exon_flank, len(chrom_seq))
-        left_flank_coord: Tuple[int, int] = (left_brd_, min_pos)
-        right_flank_coord: Tuple[int, int] = (max_pos, right_brd_)
+        # left_flank_coord: Tuple[int, int] = (left_brd_, min_pos)
+        # right_flank_coord: Tuple[int, int] = (max_pos, right_brd_)
         left_flank: str = chrom_seq[left_brd_ : min_pos].upper()
         right_flank: str = chrom_seq[max_pos : right_brd_].upper()
         # correct for strand:
@@ -2097,7 +2042,9 @@ def check_ref_exons(
     ## show error message and die
     if not mask_stops:
         sys.stderr.write(">>>STOP_CODON>>>\n")
-        die("Inframe stop codons were found but masking was disabled; exiting", 0)
+        raise Exception(
+            "Inframe stop codons were found but masking was disabled; exiting"
+        )
 
     safe_seq: str = "".join(codons)
     stop_masked: Dict[int, str] = {}
@@ -2190,7 +2137,7 @@ def transcriptwise_subchains(
     """
     ####### TODO: NEEDS TESTING FOR FUNCTIONALITY, COMPATIBILITY, AND PERFORMANCE SPEED
     sorted_blocks: List[Tuple[int]] = []
-    tr2blocks: Dict[str, Dict[str, Tuplep[int]]] = defaultdict(dict)
+    tr2blocks: Dict[str, Dict[str, Tuple[int]]] = defaultdict(dict)
     ## split chain string into separate lines
     # split_chain: List[str] = chain.split('\n')
     # init1 = datetime.now()
@@ -3189,8 +3136,8 @@ def get_chain(chain_file, chain_id):
             )
         except subprocess.CalledProcessError:
             # die if the command died
-            die(
-                "Error! Process {extract_by_id_cmd} died! Please check if input data is correct",
+            raise Exception(
+                f"Error! Process {extract_by_id_cmd} died! Please check if input data is correct",
                 1,
             )
         return chain
@@ -3203,9 +3150,8 @@ def get_chain(chain_file, chain_id):
                 "utf-8"
             )
         except subprocess.CalledProcessError:
-            die(
+            raise Exception(
                 "Error! Process {extract_by_id_cmd} died! Please check if input data is correct",
-                1,
             )
         return chain
 

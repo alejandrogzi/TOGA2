@@ -15,7 +15,8 @@ from typing import (
     Any, Dict, Iterable, List, Optional, Set, Tuple, TypeVar, Union
 )
 from .ucsc_report import (
-    exon_aln_entry, exon_aln_header, format_fasta_as_aln, mutation_table, ProjectionPlotter
+    exon_aln_entry, exon_aln_header, format_fasta_as_aln, 
+    mutation_table, ProjectionPlotter
 )
 
 __author__ = 'Yury V. Malovichko'
