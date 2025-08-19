@@ -28,7 +28,7 @@ EXON_COV_THRESHOLD = 1.33
 MAX_OVERLAP = 250  # TODO: check whether 250 is a good option
 
 __author__ = "Ekaterina Osipova & Bogdan M. Kirilenko"
-__credits__ = 'Yury V. Malovichko'
+__credits__ = ('Yury V. Malovichko')
 __year__ = '2024'
 __all__ = (None)
 

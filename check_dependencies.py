@@ -231,7 +231,8 @@ tar -xzvf bin/v1.5.2.tar.gz -C bin/ && rm -rf bin/v1.5.2.tar.gz && mv bin/intron
 """
 SPLICEAI_INSTALL_CMD: str = 'git clone https://github.com/Illumina/SpliceAI.git bin/SpliceAI && cd bin/SpliceAI && python setup.py install'
 PRANK_INSTALL_CMD: str = """
-git clone https://github.com/ariloytynoja/prank-msa.git bin/prank && cd bin/prank && make
+git clone https://github.com/ariloytynoja/prank-msa.git bin/prank && \
+    cd bin/prank/src && make && mv prank ../
 """
 IQTREE2_INSTALL_CMD: str = """
 wget -P bin/iqtree2 https://github.com/iqtree/iqtree2/releases/download/v2.4.0/iqtree-2.4.0-Linux-intel.tar.gz && \

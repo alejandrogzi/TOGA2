@@ -2061,7 +2061,8 @@ class TogaMain(CommandLineManager):
         from .prepare_pseudogene_track import PseudogeneTrackBuilder
         args: List[str] = [
             self.tr2chain_classes, self.chain_file_copy, 
-            '-o', self.pseudogene_annotation, '-l', self.log_file, '-v'
+            '-o', self.pseudogene_annotation, 
+            '-ln', self.project_name, '-v'
         ]
         PseudogeneTrackBuilder(args, standalone_mode=False)
 
@@ -2205,13 +2206,21 @@ class TogaMain(CommandLineManager):
         _ = self._exec(
             unresolved_aggr_cmd, 'ERROR: Unresolved clades\' data aggregation failed'
         )
-        ## TODO: Import the class instead!
-        cmd: str = (
-            f'{self.FINAL_RESOLVER_SCRIPT} {self.temporary_orth_report} '
-            f'{self.resolved_leaves_file} -o {self.orth_resolution_raw} '
-            f'-o2z {self.one2zero_genes} '
-        )
-        _ = self._exec(cmd, 'ERROR: Final orthology resolution failed')
+        # ## TODO: Import the class instead!
+        # cmd: str = (
+        #     f'{self.FINAL_RESOLVER_SCRIPT} {self.temporary_orth_report} '
+        #     f'{self.resolved_leaves_file} -o {self.orth_resolution_raw} '
+        #     f'-o2z {self.one2zero_genes} '
+        # )
+        # _ = self._exec(cmd, 'ERROR: Final orthology resolution failed')
+        from .final_orthology_aggregator import FinalOrthologyResolver
+        args: List[str] = [
+            self.temporary_orth_report, self.resolved_leaves_file,
+            '-o', self.orth_resolution_raw,
+            '-o2z', self.one2zero_genes,
+            '--loss_summary', self.gene_loss_summary
+        ]
+        FinalOrthologyResolver(args, standalone_mode=False)
 
     def gene_tree_summary(self) -> None:
         """

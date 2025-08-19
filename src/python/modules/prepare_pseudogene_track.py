@@ -7,7 +7,9 @@ Prepares a BED12 track for processed pseudogenes found by TOGA2
 from .cesar_wrapper_constants import PINK
 from collections import defaultdict
 from .shared import CommandLineManager, CONTEXT_SETTINGS
-from typing import Any, Dict, List, Optional, Set, TextIO, Tuple
+from typing import (
+    Any, Dict, List, Optional, Set, TextIO, Tuple, Union
+)
 
 import click
 import os
@@ -68,6 +70,15 @@ def dfs(
     help='A file to log the code progress to'
 )
 @click.option(
+    '--log_name',
+    '-ln',
+    type=str,
+    metavar='STR',
+    default=None,
+    show_default=True,
+    help='Logger name to use; relevant only upon main class import'
+)
+@click.option(
     '--verbose',
     '-v',
     is_flag=True,
@@ -90,10 +101,12 @@ class PseudogeneTrackBuilder(CommandLineManager):
         output: Optional[click.File],
         # chain_index_file: Optional[click.File],
         log_file: Optional[click.Path],
+        log_name: Optional[Union[str, None]],
         verbose: Optional[bool]
     ) -> None:
         self.v: bool = verbose
         self.set_logging()
+
         self._to_log('Initializing pseudogene track builder')
         self.output: TextIO = output
         self.chains: Set[str] = set()

@@ -5,7 +5,6 @@ Aggregates the results from the initial (graph-based) and fine (tree-based)
 orthology resolution steps
 """
 
-from .cesar_wrapper_constants import I, PI, UL, M, L, PG, N
 from .constants import Headers
 from collections import defaultdict
 from .shared import CommandLineManager, CONTEXT_SETTINGS
@@ -29,8 +28,6 @@ Q_PREFIX: str = "#Q#"
 R_PREFIX: str = "#R#"
 # ABS_EDGE_THRESHOLD: float = 0.75
 # REL_EDGE_THRESHOLD: float = 0.9
-# ALL_LOSS_SYMBOLS: Tuple[str] = (I, PI, UL, M, L, PG, N)
-# DEFAULT_LOSS_SYMBOLS: Tuple[str] = (I, PI, UL)
 ONE2ZERO: str = 'one2zero'
 ONE2ONE: str = 'one2one'
 ONE2MANY: str = 'one2many'
@@ -360,8 +357,6 @@ class FinalOrthologyResolver(CommandLineManager):
                     recorded_lines: bool = True
                 for other_query_tr in self.query_gene2tr[query_gene]:
                     other_ref_tr: str = '#'.join(other_query_tr.split('#')[:-1])
-                    # if other_ref_tr == ref_tr and recorded_lines:
-                    #     continue
                     ## projections from other genes are counted as rejected
                     if self.ref_tr2gene[other_ref_tr] != ref_gene:
                         self._to_log(f'Skipping {other_query_tr} since it does not belong to the original reference gene')
