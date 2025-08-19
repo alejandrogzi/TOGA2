@@ -6,7 +6,7 @@ from _io import TextIOWrapper
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
-from cesar_wrapper_constants import (
+from .cesar_wrapper_constants import (
     AA_CODE, ACCEPTOR_SITE, A_T_BLOSUM, A_T_PID, 
     DEL_PEN, DONOR_SITE, FLANK_SPACE, GAP_CODON, 
     HQ_BLOSUM, HQ_PID, INS_PEN, LO_T_BLOSUM, LO_T_PID, 
