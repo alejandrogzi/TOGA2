@@ -1044,7 +1044,7 @@ def toga2() -> None:
     '-q',
     type=str,
     metavar='QUEUE_NAME',
-    default='medium',
+    default='batch',
     show_default=True,
     help=(
         'Cluster partition/queue name used. Default value assumes that name '
