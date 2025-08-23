@@ -206,16 +206,16 @@ class TogaMain(CommandLineManager):
         )
         self.exon_locus_flank: int = exon_locus_flank
         self.assembly_gap_size: int = assembly_gap_size
-        self.cesar_canon_u2_acceptor: click.Path = cesar_canon_u2_acceptor
-        self.cesar_canon_u2_donor: click.Path = cesar_canon_u2_donor
-        self.cesar_non_canon_u2_acceptor: click.Path = cesar_non_canon_u2_acceptor
-        self.cesar_non_canon_u2_donor: click.Path = cesar_non_canon_u2_donor
-        self.cesar_canon_u12_acceptor: click.Path = cesar_canon_u12_acceptor
-        self.cesar_canon_u12_donor: click.Path = cesar_canon_u12_donor
-        self.cesar_non_canon_u12_acceptor: click.Path = cesar_non_canon_u12_acceptor
-        self.cesar_non_canon_u12_donor: click.Path = cesar_non_canon_u12_donor
-        self.cesar_first_acceptor: click.Path = cesar_first_acceptor
-        self.cesar_last_donor: click.Path = cesar_last_donor
+        self.cesar_canon_u2_acceptor: click.Path = self._abspath(cesar_canon_u2_acceptor)
+        self.cesar_canon_u2_donor: click.Path = self._abspath(cesar_canon_u2_donor)
+        self.cesar_non_canon_u2_acceptor: click.Path = self._abspath(cesar_non_canon_u2_acceptor)
+        self.cesar_non_canon_u2_donor: click.Path = self._abspath(cesar_non_canon_u2_donor)
+        self.cesar_canon_u12_acceptor: click.Path = self._abspath(cesar_canon_u12_acceptor)
+        self.cesar_canon_u12_donor: click.Path = self._abspath(cesar_canon_u12_donor)
+        self.cesar_non_canon_u12_acceptor: click.Path = self._abspath(cesar_non_canon_u12_acceptor)
+        self.cesar_non_canon_u12_donor: click.Path = self._abspath(cesar_non_canon_u12_donor)
+        self.cesar_first_acceptor: click.Path = self._abspath(cesar_first_acceptor)
+        self.cesar_last_donor: click.Path = self._abspath(cesar_last_donor)
         self.separate_site_treat: bool = separate_splice_site_treatment
 
         self.bigwig2wig_binary: click.Path = bigwig2wig_binary
@@ -228,12 +228,12 @@ class TogaMain(CommandLineManager):
         self.min_intron_prob_trusted: bool = min_intron_prob_trusted
         self.min_intron_prob_supported: bool = min_intron_prob_supported
         self.min_intron_prob_unsupported: bool = min_intron_prob_unsupported
-
+        self.max_intron_number: int = max_intron_number
         self.cesar_binary: Union[str, None] = cesar_binary
         self.cesar_memory_bins: str = memory_bins
         self.job_nums_per_bin: str = job_nums_per_bin
         self.allow_heavy_jobs: bool = allow_heavy_jobs
-        self.matrix_file: str = matrix
+        self.matrix_file: str = self._abspath(matrix)
         self.mask_terminal_mutations: bool = mask_n_terminal_mutations
         self.leave_missing_stop: bool = disable_missing_stop_search
         self.consider_alt_frame: bool = account_for_alternative_frame
@@ -1004,6 +1004,12 @@ class TogaMain(CommandLineManager):
                 Constants.CRASH_EMAIL.format(self.project_name, self.output, msg))
         super()._die(msg)
 
+    def _abspath(self, path: str) -> str:
+        """Checks whether a path is absolute, prepends root prefix if not"""
+        if os.path.isabs(path):
+            return path
+        return os.path.abspath(path)
+
     def _execute_step(self, step: str):
         """
         Defines whether the current step is to be executed based on 'resume' and 'halt' options
@@ -1236,7 +1242,7 @@ class TogaMain(CommandLineManager):
             context = open(self.cesar_job_list_summary, 'w')
         else: 
             context = nullcontext()
-        with context as h:
+        with context as c:
             for i, joblist in joblists.items():
                 new_joblist_name: str = f'{joblist}_partial_{self.project_name}'
                 jobs: List[str] = jobfiles_to_execute[i]
@@ -1244,7 +1250,7 @@ class TogaMain(CommandLineManager):
                     continue
                 # print(f'{i=}, {joblist=}, {jobs=}')
                 if step == 'alignment':
-                    h.write(f'{new_joblist_name}\t{i}\n')
+                    c.write(f'{new_joblist_name}\t{i}\n')
                 else:
                     self.__setattr__(
                         step2joblist[step], new_joblist_name
@@ -1478,7 +1484,7 @@ class TogaMain(CommandLineManager):
 
     def _check_nextflow_configs(self) -> None:
         """Checks Nextflow configuration file directory contents"""
-        if self.nextflow_config_dir is None:
+        if self.nextflow_config_dir == self.nextflow_dir:
             return
         expected_configs: Dict[str, str] = {
             **Constants.UNIQUE_CONFIGS, 
@@ -1506,6 +1512,7 @@ class TogaMain(CommandLineManager):
             f'{self.CHAIN_FILTER_SCRIPT} -i {self.chain_file} '
             f'-s {self.min_chain_score} -o {self.chain_file_copy}'
         )
+        ## TODO: For later: Query contig filter ideally goes here
         _ = self._exec(cmd, 'Chain filtering step failed')
 
     def get_contig_sizes(self, ref: bool) -> None:
@@ -1607,9 +1614,11 @@ class TogaMain(CommandLineManager):
         ## filter the reference BED file first ## TODO: Accommodate for the optional arguments
         from .filter_ref_bed import AnnotationFilter
         args: List[str] = [
-            self.ref_annotation, self.bed_file_copy, self.prefiltered_transcripts,
+            self.ref_annotation, self.bed_file_copy, 
+            self.prefiltered_transcripts,
             '-ln', self.project_name
         ]
+        ## TODO: Add the contig filter flags
         self._to_log('Filtering reference BED file')
         AnnotationFilter(args, standalone_mode=False)
 

@@ -567,7 +567,7 @@ TOGA2_SLOTS: Tuple[str] = (
     'exon_locus_flank', 'assembly_gap_size', 
     'bigwig2wig_binary','bedtobigbed_binary', 'fatotwobit_binary', 'twobittofa_binary',
     'min_splice_prob', 'splice_prob_margin',
-    'intron_gain_check', 'min_intron_gain_score', 
+    'intron_gain_check', 'max_intron_number', 'min_intron_gain_score', 
     'min_intron_prob_gapped', 'min_intron_prob_ungapped',
     'min_intron_prob_trusted', 'min_intron_prob_supported', 'min_intron_prob_unsupported',
     'cesar_binary', 'cesar_memory_bins', 'job_nums_per_bin', 'allow_heavy_jobs',
@@ -707,7 +707,7 @@ TOGA2_SLOT2ARG: Dict[str, str] = {
     'cesar_canon_u12_acceptor': 'cesar_canon_u12_acceptor',
     'cesar_canon_u12_donor': 'cesar_canon_u12_donor',
     'cesar_non_canon_u12_acceptor': 'cesar_non_canon_u12_acceptor',
-    'cesar_non_canon_u12_donor': 'cesar_canon_u12_donor',
+    'cesar_non_canon_u12_donor': 'cesar_non_canon_u12_donor',
     'cesar_first_acceptor': 'cesar_first_acceptor',
     'cesar_last_donor': 'cesar_last_donor',
     'separate_site_treat': 'separate_splice_site_treatment',
@@ -725,6 +725,7 @@ TOGA2_SLOT2ARG: Dict[str, str] = {
     'cesar_memory_bins': 'memory_bins',
     'job_nums_per_bin': 'job_nums_per_bin',
     'allow_heavy_jobs': 'allow_heavy_jobs',
+    'max_intron_number': 'max_intron_number',
     'matrix_file': 'matrix',
     'mask_terminal_mutations': 'mask_n_terminal_mutations',
     'leave_missing_stop': 'disable_missing_stop_search',
@@ -758,5 +759,12 @@ TOGA2_SLOT2ARG: Dict[str, str] = {
     'keep_tmp': 'keep_temporary_files',
     'v': 'verbose',
     'email': 'email',
-    'mailx_binary': 'mailx_binary'
+    'mailx_binary': 'mailx_binary',
+    'fatotwobit_binary': 'fatotwobit_binary',
+    'twobittofa_binary': 'twobittofa_binary',
+    'ucsc_prefix': 'ucsc_prefix',
+    'bedtobigbed_binary': 'bedtobigbed_binary',
+    'ignore_crashed_parallel_batches': 'ignore_crashed_parallel_batches'
 }
+
+TOGA2_ARG2SLOT: Dict[str, str] = {v:k for k,v in TOGA2_SLOT2ARG.items()}

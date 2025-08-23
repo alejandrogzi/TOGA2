@@ -133,11 +133,11 @@ class AnnotationFilter(CommandLineManager):
         ref_bed: click.File,
         output: click.File,
         rejection_log: click.File,
-        contigs: str,
-        excluded_contigs: str,
-        disable_frame_filter: bool,
+        contigs: Optional[Union[str, None]],
+        excluded_contigs: Optional[Union[str, None]],
+        disable_frame_filter: Optional[bool],
         log_name: Optional[str],
-        verbose: bool
+        verbose: Optional[bool]
     ) -> None:
 
         self.v: bool = verbose

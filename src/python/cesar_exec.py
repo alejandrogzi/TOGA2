@@ -301,7 +301,8 @@ LAST_DONOR: str = os.path.abspath(os.path.join(LOCATION, *LAST_DONOR))
     default=4, 
     show_default=True,
     help=(
-        'Maximum gained intron number per exon. Highly recommended to increase this beyond 5-6'
+        'Maximum gained intron number per exon. '
+        'Highly recommended not to increase this beyond 5-6'
     )
 )
 @click.option(

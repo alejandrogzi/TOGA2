@@ -660,8 +660,8 @@ def toga2() -> None:
     metavar='BIGWIG2WIG_BINARY',
     default=None,
     help=(
-        'A path to the UCSC bigWigToWig binary; if none is provided or found '
-        'in PATH, default is set to Hiller Lab Delta cluster utility location'
+        'A path to the UCSC bigWigToWig binary; if none is provided, '
+        'the utility will be sought for in $PATH under its default name'
     )
 )
 @spliceai_options.option(
@@ -768,7 +768,8 @@ def toga2() -> None:
     default=4, 
     show_default=True,
     help=(
-        'Maximum gained intron number per exon. Highly recommended to increase this beyond 5-6'
+        'Maximum gained intron number per exon. '
+        'Highly recommended not to increase this beyond 5-6'
     )
 )
 @annot_options.option(
@@ -1229,7 +1230,8 @@ def run(**kwargs) -> None:
     show_default=True,
     help=(
         'Additional settings for TOGA2 listed in double quotation marks. '
-        'Settings provided this way will supersede those listed in the configuration file'
+        'Settings provided this way will supersede those listed in the configuration file. '
+        'WARNING: Currenly does not accept argument short (single-dash) names'
     )
 )
 
@@ -1248,13 +1250,17 @@ def from_config(config_file: click.File, override: Optional[str]) -> None:
     from_config - Run TOGA2 pipeline with a predefined configuration file
 
     \b
-    NOTE: This mode is currently under development and has not been tested yet.
+    The only positional argument is a path to a two-column configuration file where first column corresponds to command line argument full names and the second column stores respective values.
+    Configuration file boilerplate is provided at supply/project_args.tsv . Alternatively, you can use and/or modify logs/project_args_${proj_name}.tsv for any successful run.
+
+    \b
+    NOTE: This mode is currently under development.
     """
     from src.python.modules.toga_configured import Toga2ConfiguredLauncher
     from src.python.modules.toga_main import TogaMain
-    
-    args: List[str] = Toga2ConfiguredLauncher(config_file, override=override)
-    TogaMain(args, standalone_mode=False)
+
+    args: List[str] = Toga2ConfiguredLauncher(config_file, override=override).run()
+    TogaMain(**args)
 
 
 @toga2.command(
