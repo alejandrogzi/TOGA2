@@ -1436,7 +1436,7 @@ def prepare_input(**kwargs) -> None:
     removed from the isoforms file. Likewise, transcripts not mapped to any gene in the isoforms file are removed from the annotation.\n
     \t3) Unless disabled, intrones in the filtered annotation are classified into U2 and U12 spliceosomal classes
     with intronIC. The resulting file can be further used with TOGA2 --u12_file/-u12 argument to improve exon annotation.\n
-    \t4) Unless disabled and provided introns were classified with intronIC, reference-specific CESAR2 HMM profiles are generated. 
+    \t4) Unless disabled, and provided that introns were classified with intronIC, reference-specific CESAR2 HMM profiles are generated. 
     TOGA2 provides CESAR2 profiles for selected mammalian and avian references used for the original companion dataset generation; these profiles were prepared with custom 
     training data and further manually adjusted for improved performance, and acquired results suggest that human-specific profiles 
     perform sufficiently well with highly distant clades (e.g., insects). However, if your reference of choice is known to have peculiar intron content 

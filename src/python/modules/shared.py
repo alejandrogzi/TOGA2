@@ -538,6 +538,12 @@ class CommandLineManager:
         except FileNotFoundError:
             pass
 
+    def _abspath(self, path: str) -> str:
+        """Checks whether a path is absolute, prepends root prefix if not"""
+        if os.path.isabs(path):
+            return path
+        return os.path.abspath(path)
+
     def _exec(
         self,
         cmd: Union[str, List[str]],

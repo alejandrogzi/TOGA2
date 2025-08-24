@@ -225,11 +225,14 @@ MISSING_PYTHON_PACKAGES: str = 'missing_packages.txt'
 MISSING_THIRD_PARTY: str = 'missing_third_party.txt'
 
 ## installation commands for third-party software
+## GLOBAL TO-DO: SpliceAi should be installed as a Python package
+## For the three remaining tools, commands should be turned into classes
 # INTRONIC_INSTALL_CMD: str = 'git clone https://github.com/glarue/intronIC.git bin/intronIC'
+##
 INTRONIC_INSTALL_CMD: str = """
 wget -P bin https://github.com/glarue/intronIC/archive/refs/tags/v1.5.2.tar.gz && \
 tar -xzvf bin/v1.5.2.tar.gz -C bin/ && rm -rf bin/v1.5.2.tar.gz && mv bin/intronIC-1.5.2 bin/intronIC
-""" ## TODO: Better install with pip!
+""" ## TODO: Pull from git; if Python>=3.12, replace SafeConfig with Config and readfp with read_file in versioner.py; go to the directory; python3 setup.py egg_info
 SPLICEAI_INSTALL_CMD: str = 'git clone https://github.com/Illumina/SpliceAI.git bin/SpliceAI && cd bin/SpliceAI && python setup.py install'
 PRANK_INSTALL_CMD: str = """
 git clone https://github.com/ariloytynoja/prank-msa.git bin/prank && \

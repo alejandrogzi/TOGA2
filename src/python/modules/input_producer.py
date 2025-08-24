@@ -11,7 +11,7 @@ from .constants import Headers
 from contextlib import nullcontext
 from .shared import (
     CommandLineManager, dir_name_by_date, 
-    get_upper_dir, hex_dir_name, parse_single_column
+    get_upper_dir, hex_dir_name
 )
 from .filter_ref_bed import (
     consistent_name, 
@@ -19,10 +19,13 @@ from .filter_ref_bed import (
     NAME_REJ_REASON, NON_CODING_REJ_REASON 
 )
 from shutil import which
-from typing import Dict, List, Optional, Tuple, Union
+from typing import Dict, List, Optional, Set, Tuple, Union
 
 import click
+import logging
 import os
+
+logging.basicConfig(level=logging.INFO)
 
 DEFAULT_PREFIX: str = 'TOGA2_ref_annotation'
 LEVEL: str = 'level'
@@ -75,11 +78,10 @@ class InputProducer(CommandLineManager):
         'disable_intron_classification', 'disable_cesar_profiles',
         'output', 'filtered_annotation', 'filtered_isoforms',
         'rejection_log', 'tr2annot', 
-        'rejected_transcripts', 'rejected_lines'
-        'cesar_profiles',
+        'rejected_transcripts', 'rejected_lines',
         'intronic', 'ic_cores',
         'twobittofa_binary', 'bed2fraction_binary',
-        'intron_file', 'all_intron_bed',
+        'tmp_dir', 'intron_file', 'all_intron_bed',
         'min_intron_length_cesar',
         'intron2class', 'intron2coords', 'profiles',
         'profile_dir',
@@ -103,22 +105,23 @@ class InputProducer(CommandLineManager):
         min_intron_length_cesar: Optional[int] = MIN_INTRON_LENGTH_FOR_PROFILES,
         keep_temporary: Optional[bool] = False
     ) -> None:
-        self.v = True
-        self.set_logging('annotation_producer')
+        self.v: bool = True
+        self.set_logging()
 
         self.twobit: click.Path = ref_2bit
         self.annot: click.Path = ref_annot
         self.isoforms: Union[click.Path, None] = ref_isoforms
-        output: str = (
+        self.output: str = (
             output if output is not None else hex_dir_name(DEFAULT_PREFIX)
         )
         self.keep_tmp: bool = keep_temporary
 
-        self._mkdir(output)
-        self.filtered_annotation: str = os.path.join(output, 'toga.transcripts.bed')
-        self.filtered_isoforms: str = os.path.join(output, 'toga.isoforms.tsv')
-        self.rejection_log: str = os.path.join(output, 'rejected_items.tsv')
+        self._mkdir(self.output)
+        self.filtered_annotation: str = os.path.join(self.output, 'toga.transcripts.bed')
+        self.filtered_isoforms: str = os.path.join(self.output, 'toga.isoforms.tsv')
+        self.rejection_log: str = os.path.join(self.output, 'rejected_items.tsv')
 
+        self.tr2annot: Dict[str, str] = {}
         self.rejected_transcripts: List[str] = []
         self.rejected_lines: List[str] = []
 
@@ -127,7 +130,6 @@ class InputProducer(CommandLineManager):
 
         ## step 2, optional: isoform file check, potential further annotation filtering 
         if self.isoforms is not None:
-            self.all_transcripts: List[str] = parse_single_column(self.annot)
             self.check_isoforms()
 
         ## write the results for steps 1 and 2
@@ -138,27 +140,29 @@ class InputProducer(CommandLineManager):
 
         ## step 3: intron classification, U12 input file preparation
         if not disable_intron_classification:
-            self.tmp_dir: str = os.path.join('output', dir_name_by_date('_tmp_intronIC'))
+            self.tmp_dir: str = os.path.join(self.output, dir_name_by_date('tmp.intronIC'))
             self.intronic: Union[click.Path, None] = self.check_intronic_binary(intronic_binary)
             self.ic_cores: int = intronic_cores
             self.twobittofa_binary: str = (
                 twobittofa_binary if twobittofa_binary is not None else DEFAULT_TWOBITTOFA
             )
             self.bed2fraction_binary: str = DEFAULT_BED2FRACTION
-            self.intron_file: str = os.path.join(output, 'toga.U12introns.bed')
+            if not disable_cesar_profiles:
+                self.intron2class: Dict[str, Tuple[str, str]] = {}
+                self.intron2coords: Dict[str, Tuple[str, int, int, bool]] = {}
+                self.min_intron_length_cesar: int = min_intron_length_cesar
+            self.intron_file: str = os.path.join(self.output, 'toga.U12introns.bed')
             self.all_intron_bed: str = os.path.join(self.tmp_dir, 'all_introns.bed')
             self._mkdir(self.tmp_dir)
             self.intron_classifier()
 
         ## step 4: CESAR2 profile generation; will not shoot if step 3 is disabled
         if not (disable_intron_classification or disable_cesar_profiles):
-            self.min_intron_length_cesar: int = min_intron_length_cesar
-            self.intron2class: Dict[str, Tuple[str, str]] = {}
-            self.intron2coords: Dict[str, Tuple[str, int, int, bool]] = {}
             self.profiles: Dict[Tuple[str, bool, str], Dict[int, Dict[str, int]]] = (
                 defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
             )
-            self.profile_dir: str = os.path.join(output, PROFILE_DIR)
+            self.profile_dir: str = os.path.join(self.output, PROFILE_DIR)
+            self._mkdir(self.profile_dir)
             self.generate_cesar_profiles()
 
     def check_annotation(
@@ -202,7 +206,7 @@ class InputProducer(CommandLineManager):
                             'field %i contains non-numeric data'
                             ) % (i, field)
                         )
-                name: str = data[4]
+                name: str = data[3]
                 ## remove the transcripts with improperly formatted names
                 if not consistent_name(name):
                     illegal_name.append(name)
@@ -249,16 +253,16 @@ class InputProducer(CommandLineManager):
                         else:
                             continue
                     frame_length += size
-                if frame_length % 3 and not self.no_frame_filter:
+                if frame_length % 3:# and not self.no_frame_filter:
                     out_of_frame.append(name)
                     continue
                 self.tr2annot[name] = line
         if illegal_name:
-            self._echo(
+            self._to_log(
                 (
                     'The following transcripts were filtered out '
                     'due to illegal symbols used in their names:\n\t%s'
-                ) % ','.join(illegal_name),
+                ) % '\n\t'.join(illegal_name),
                 'warning'
             )
             self.rejected_transcripts.extend(illegal_name)
@@ -270,7 +274,7 @@ class InputProducer(CommandLineManager):
                 (
                     'The following transcripts were filtered out '
                     'due to their location in deprecated contigs:\n\t%s'
-                ) % ','.join(rejected_contigs),
+                ) % '\n\t'.join(rejected_contigs),
                 'warning'
             )
             self.rejected_transcripts.extend(rejected_contigs)
@@ -282,7 +286,7 @@ class InputProducer(CommandLineManager):
                 (
                     'The following transcripts were filtered out '
                     'due to absence of coding sequence:\n\t%s'
-                ) % ','.join(non_coding),
+                ) % '\n\t'.join(non_coding),
                 'warning'
             )
             self.rejected_transcripts.extend(non_coding)
@@ -293,8 +297,8 @@ class InputProducer(CommandLineManager):
             self._to_log(
                 (
                     'The following transcripts were filtered out '
-                    'due to shifted reading frame'
-                ) % ','.join(out_of_frame),
+                    'due to shifted reading frame:\n\t%s'
+                ) % '\n\t'.join(out_of_frame),
                 'warning'
             )
             self.rejected_transcripts.extend(out_of_frame)
@@ -313,7 +317,7 @@ class InputProducer(CommandLineManager):
         from the final annotation. 
         """
         gene2trs: Dict[str, List[str]] = {}
-        trs_found: List[str] = []
+        trs_found: Set[str] = set()
         with open(self.isoforms, 'r') as h:
             for i, line in enumerate(h, start=1):
                 data: List[str] = line.rstrip().split('\t')
@@ -332,12 +336,12 @@ class InputProducer(CommandLineManager):
                 if tr in self.rejected_transcripts:
                     continue
                 gene2trs[gene].append(tr)
-                trs_found.append(tr)
+                trs_found.add(tr)
         rejected_genes: List[str] = []
 
         ## write the remaining isoforms to the output file
         with open(self.filtered_isoforms, 'w') as h:
-            for gene, trs in gene2trs:
+            for gene, trs in gene2trs.items():
                 if not trs:
                     rejected_genes.append(gene)
                     continue
@@ -351,7 +355,7 @@ class InputProducer(CommandLineManager):
                     'The following genes were removed from the '
                     'isoforms file because all the respective '
                     'transcripts were removed from the annotation:\n\t%s'
-                ) % ','.join(rejected_genes),
+                ) % '\n\t'.join(rejected_genes),
                 'warning'
             )
             self.rejected_lines.extend(
@@ -359,7 +363,7 @@ class InputProducer(CommandLineManager):
             )
         ## report transcripts for which genes were not found in the isoform file
         rejected_transcripts: List[str] = [
-            x for x in self.all_transcripts if x not in trs_found
+            x for x in self.tr2annot if x not in trs_found
         ]
         if rejected_transcripts:
             self._to_log(
@@ -367,7 +371,7 @@ class InputProducer(CommandLineManager):
                     'The following transcripts were removed from the '
                     'annotation because they were not mapped to any gene '
                     'in the isoform file'
-                ) % ','.join(rejected_transcripts),
+                ) % '\n\t'.join(rejected_transcripts),
                 'warning'
             )
             self.rejected_lines.extend(
@@ -383,6 +387,7 @@ class InputProducer(CommandLineManager):
             self._die(
                 'All transcripts were filtered out for various reasons'
             )
+        self._to_log('Writing the filtered annotation to %s' % self.filtered_annotation)
         with open(self.filtered_annotation, 'w') as h:
             for line in self.tr2annot.values():
                 h.write(line + '\n')
@@ -391,8 +396,9 @@ class InputProducer(CommandLineManager):
         """Writes the rejected items to the file"""
         if not self.rejected_lines:
             return
+        self._to_log('Writing the rejected items to %s' % self.rejection_log)
         with open(self.rejection_log, 'w') as h:
-            h.write(Headers.REJ_LOG_HEADER + '\n')
+            h.write(Headers.REJ_LOG_HEADER)
             for line in self.rejected_lines:
                 h.write(line + '\n')
 
@@ -478,7 +484,7 @@ class InputProducer(CommandLineManager):
         raw_intron_file: str = os.path.join(self.tmp_dir, 'raw_introns.bed')
         intron_bed_cmd: str = (
             f'{self.bed2fraction_binary} -i {self.annot} -o {raw_intron_file} '
-            '-m cds -b'
+            '-m cds -n -b'
         )
         _ = self._exec(intron_bed_cmd, 'Intron Bed6 extraction failed:')
         ## select unique introns and anonimize them
@@ -486,8 +492,8 @@ class InputProducer(CommandLineManager):
         intron_bed: str = os.path.join(self.tmp_dir, 'intronic_input.bed')
         uniq_cmd: str = (
             f'cut -f1-3,5,6 {raw_intron_file} | sort -u | '
-            'awk \'BEGIN{OFS="\t"}{print $1,$2,$3,"intron"NR,$4,$5}\' > ',
-            intron_bed
+            'awk \'BEGIN{OFS="\\t"}{print $1,$2,$3,"intron"NR,0,$5}\' > '
+            f'{intron_bed}'
         )
         _ = self._exec(uniq_cmd, 'Intron deduplication failed:')
         ## run intronIC
@@ -495,7 +501,7 @@ class InputProducer(CommandLineManager):
         ic_output: str = os.path.join(self.tmp_dir, 'output')
         intronic_cmd: str = (
             f'{self.intronic} -g {genome_fasta} -b {intron_bed} -n {ic_output} '
-            f'-p {self.ic_cores} --no_nc_ss_adjustment'
+            f'-p {self.ic_cores} --no_nc_ss_adjustment --no_abbreviate'
         )
         _ = self._exec(intronic_cmd, 'intronIC run failed:')
         ## now, prepare the final file
@@ -541,9 +547,9 @@ class InputProducer(CommandLineManager):
                             'expected 14 fields, got %i'
                         ) % (i, len(data))
                     )
-                name: str = data[0].split(';')
+                name: str = data[0].split(';')[0]
                 dinuc: str = data[2]
-                intron_class: str = data[12]
+                intron_class: str = data[12].upper()
                 upd_name: str = f'{name}_{intron_class}_{dinuc}'
                 out_line: str = '\t'.join(intron2coords[name]).format(upd_name)
                 ## for TOGA2 input, only U12 and non-canonical U2 introns are required
@@ -557,14 +563,14 @@ class InputProducer(CommandLineManager):
                 ## and store their class data
                 if not self.disable_cesar_profiles:
                     ah.write(out_line + '\n')
-                    start: int = int(data[1])
-                    end: int = int(data[2])
+                    chrom, start, end, _, _, strand = intron2coords[name]
+                    start = int(start)
+                    end = int(end)
+                    strand: bool = data[5] == '+'
                     if end - start < self.min_intron_length_cesar:
                         continue
-                    strand: bool = data[5] == '+'
-                    intron_key: Tuple[str, int, int, bool] = (data[0], start, end, strand)
+                    intron_key: Tuple[str, int, int, bool] = (chrom, start, end, strand)
                     num: str = name.replace('intron', '')
-                    self.class2intron_num[(intron_class, is_canon)].append(num)
                     self.intron2class[num] = (intron_class, is_canon)
                     self.intron2coords[num] = intron_key
 
@@ -575,14 +581,14 @@ class InputProducer(CommandLineManager):
 
 
 
-    def cesar_profiles(self) -> None:
+    def generate_cesar_profiles(self) -> None:
         """
         Given the intronIC classification for filtered annotation reference introns
         """
         ## step 1: prepare profile sequence coordinates in Bed format
         bed_string: str = ''
         ## extract coordinates
-        for num, coords in self.intron2coords:
+        for num, coords in self.intron2coords.items():
             chrom, start, end, strand = coords
             ## define donor and acceptor sequence coordinates
             if strand:
@@ -620,6 +626,7 @@ class InputProducer(CommandLineManager):
             )
         
         ## step 2: parse the resulting Fasta and update the resulting profiles
+        self._to_log('Inferring positional letter probabilities')
         header: str = ''
         seq: str = ''
         for line in res.split('\n'):
@@ -646,12 +653,15 @@ class InputProducer(CommandLineManager):
 
         ## step 3: compute the letter probabilities per position from the recorded frequencies
         ## and write the resulting profiles
+        self._to_log(
+            'Computing CESAR2 profiles and writing them to %s' % self.profile_dir
+        )
         header: str = '\t'.join(NUCS)
         for key in self.profiles:
             intron_class, canon, site_type = key
             canon_line: str = CANON if canon else NONCANON
             filename: str = f'{canon_line}_{intron_class}_{site_type}.tsv'
-            with open(os.path.join(self.output, filename), 'w') as h:
+            with open(os.path.join(self.profile_dir, filename), 'w') as h:
                 h.write(header + '\n')
                 for pos in sorted(self.profiles[key].keys()):
                     pos_sum: float = float(sum(self.profiles[key][pos].values()))
@@ -668,7 +678,7 @@ class InputProducer(CommandLineManager):
         ## equiprobable acceptor is recommended for non-canonical U12 in mammals
         ## equiprobable donors have not been tested for any purpose yet
         ## but it's nice to have both options generated automatically
-        equi_line: str = '\t'.join(map(str, [0.25] * 4) + '\n')
+        equi_line: str = '\t'.join(map(str, [0.25] * 4)) + '\n'
         equi_acc: str = os.path.join(self.profile_dir, EQUI_ACC)
         with open(equi_acc, 'w') as h:
             h.write(header + '\n')
@@ -676,7 +686,7 @@ class InputProducer(CommandLineManager):
                 h.write(equi_line)
         equi_donor: str = os.path.join(self.profile_dir, EQUI_DONOR)
         with open(equi_donor, 'w') as h:
-            h.wirte(header + '\n')
+            h.write(header + '\n')
             for _ in range(DONOR_PROFILE_LEN):
                 h.write(equi_line)
 
@@ -728,4 +738,9 @@ class InputProducer(CommandLineManager):
             if nuc not in NUCS:
                 self._die('Ambiguous nucleotide encountered: %s' % nuc)
             self.profiles[key][pos][nuc] += 1
+
+    def set_logging(self) -> None:
+        """Sets logging and disables logging propagation"""
+        super().set_logging()
+        self.logger.propagate = False
 
