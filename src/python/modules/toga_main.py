@@ -6,10 +6,12 @@ from collections import defaultdict
 from contextlib import nullcontext
 from .constants import Constants, TOGA2_SLOTS, TOGA2_SLOT2ARG
 from .parallel_jobs_manager import (
-    CustomStrategy, NextflowStrategy, ParaStrategy, ParallelJobsManager
+    CustomStrategy, NextflowStrategy, 
+    ParaStrategy, ParallelJobsManager
 )
 from .shared import (
-    CommandLineManager, dir_name_by_date, get_upper_dir, hex_dir_name
+    CommandLineManager, dir_name_by_date, 
+    get_upper_dir, hex_dir_name
 )
 from pathlib import Path
 from shutil import copy, which
@@ -158,10 +160,10 @@ class TogaMain(CommandLineManager):
         self.project_name: str = hex_dir_name('TOGA2')
 
         ## internalized attributes
-        self.ref_2bit: click.Path = os.path.abspath(ref_2bit)
-        self.query_2bit: click.Path = os.path.abspath(query_2bit)
-        self.chain_file: click.Path = chain_file
-        self.ref_annotation: click.Path = ref_annotation
+        self.ref_2bit: click.Path = self._abspath(ref_2bit)
+        self.query_2bit: click.Path = self._abspath(query_2bit)
+        self.chain_file: click.Path = self._abspath(chain_file)
+        self.ref_annotation: click.Path = self._abspath(ref_annotation)
 
         self.resume_from: str = resume_from
         self.halt_at: str = halt_at
@@ -176,9 +178,9 @@ class TogaMain(CommandLineManager):
         )
         self.skip_utr: bool = no_utr_annotation
 
-        self.isoform_file: Union[click.Path, None] = isoform_file
-        self.u12_file: Union[click.Path, None] = u12_file
-        self.spliceai_dir: Union[click.Path, None] = spliceai_dir
+        self.isoform_file: Union[click.Path, None] = self._abspath(isoform_file)
+        self.u12_file: Union[click.Path, None] = self._abspath(u12_file)
+        self.spliceai_dir: Union[click.Path, None] = self._abspath(spliceai_dir)
 
         self.min_chain_score: int = min_chain_score
         self.min_orth_chain_score: int = min_orthologous_chain_score

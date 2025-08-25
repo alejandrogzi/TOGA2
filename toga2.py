@@ -13,7 +13,9 @@ from src.python.modules.cesar_wrapper_constants import (
     FIRST_ACCEPTOR, LAST_DONOR
 )
 from src.python.modules.constants import TOGA2_EPILOG, Constants
-from src.python.modules.input_producer import MIN_INTRON_LENGTH_FOR_PROFILES
+from src.python.modules.input_producer import (
+    MIN_INTRON_LENGTH_FOR_CLASSIFICATION, MIN_INTRON_LENGTH_FOR_PROFILES
+)
 from src.python.modules.shared import CONTEXT_SETTINGS, PrettyGroup
 from typing import List, Optional
 
@@ -1383,6 +1385,16 @@ def from_config(config_file: click.File, override: Optional[str]) -> None:
     help='Number of CPUs to run intronIC with'
 )
 @click.option(
+    '--min_intron_length_intronic',
+    type=click.IntrRange(min=1),
+    metavar='INT',
+    default=MIN_INTRON_LENGTH_FOR_CLASSIFICATION,
+    show_default=True,
+    help=(
+        'Minimal intron length for intronIC to consider for classification'
+    )
+)
+@click.option(
     '--twobittofa_binary',
     type=click.Path(exists=True),
     metavar='PATH',
@@ -1452,6 +1464,34 @@ def prepare_input(**kwargs) -> None:
     """
     from src.python.modules.input_producer import InputProducer
     InputProducer(**kwargs)
+
+
+@toga2.command(
+    context_settings=CONTEXT_SETTINGS, 
+    no_args_is_help=True, 
+    short_help="Generate SpliceAI predictions for query assembly"
+)
+@click.argument(
+    'query_2bit',
+    type=click.Path(exists=True),
+    metavar='QUERY_2BIT'
+)
+
+def spliceai() -> None:
+    """
+    \b
+    MMP""MM""YMM   .g8""8q.     .g8\"""bgd      db          `7MMF'`7MMF'
+    P'   MM   `7 .dP'    `YM. .dP'     `M     ;MM:           MM    MM  
+         MM     dM'      `MM dM'       `     ,V^MM.          MM    MM  
+         MM     MM        MM MM             ,M  `MM          MM    MM  
+         MM     MM.      ,MP MM.    `7MMF'  AbmmmqMA         MM    MM  
+         MM     `Mb.    ,dP' `Mb.     MM   A'     VML        MM    MM  
+       .JMML.     `"bmmd"'     `"bmmmdPY .AMA.   .AMMA.    .JMML..JMML.
+
+    \b
+    spliceai - Predict putative splice sites in the query assembly with SpliceAI
+    NOTE: This mode is currently under development.
+    """
 
 
 

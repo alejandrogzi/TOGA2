@@ -39,6 +39,7 @@ U12: str = 'U12'
 U2: str = 'U2'
 CANON_SITES: Tuple[str] = ('GT-AG', 'GC-AG')
 U12_CANON_SITES: str = 'GT-AG'
+MIN_INTRON_LENGTH_FOR_CLASSIFICATION: int = 30
 MIN_INTRON_LENGTH_FOR_PROFILES: int = 70
 ENTRY_START: str = '>'
 ACC: str = 'acceptor'
@@ -82,7 +83,7 @@ class InputProducer(CommandLineManager):
         'intronic', 'ic_cores',
         'twobittofa_binary', 'bed2fraction_binary',
         'tmp_dir', 'intron_file', 'all_intron_bed',
-        'min_intron_length_cesar',
+        'min_intron_length_intronic', 'min_intron_length_cesar',
         'intron2class', 'intron2coords', 'profiles',
         'profile_dir',
         'keep_tmp'
@@ -101,6 +102,7 @@ class InputProducer(CommandLineManager):
         disable_cesar_profiles: Optional[bool] = False,
         intronic_binary: Optional[Union[click.Path,  None]] = None,
         intronic_cores: Optional[int] = 1,
+        min_intron_length_intronic: Optional[int] = MIN_INTRON_LENGTH_FOR_CLASSIFICATION,
         twobittofa_binary: Optional[Union[click.Path, None]] = None,
         min_intron_length_cesar: Optional[int] = MIN_INTRON_LENGTH_FOR_PROFILES,
         keep_temporary: Optional[bool] = False
@@ -147,6 +149,7 @@ class InputProducer(CommandLineManager):
                 twobittofa_binary if twobittofa_binary is not None else DEFAULT_TWOBITTOFA
             )
             self.bed2fraction_binary: str = DEFAULT_BED2FRACTION
+            self.min_intron_length_intronic: int = min_intron_length_intronic
             if not disable_cesar_profiles:
                 self.intron2class: Dict[str, Tuple[str, str]] = {}
                 self.intron2coords: Dict[str, Tuple[str, int, int, bool]] = {}
@@ -501,7 +504,8 @@ class InputProducer(CommandLineManager):
         ic_output: str = os.path.join(self.tmp_dir, 'output')
         intronic_cmd: str = (
             f'{self.intronic} -g {genome_fasta} -b {intron_bed} -n {ic_output} '
-            f'-p {self.ic_cores} --no_nc_ss_adjustment --no_abbreviate'
+            f'-p {self.ic_cores}  --min_intron_len {self.min_intron_length_intronic} '
+            '--no_nc_ss_adjustment --no_abbreviate'
         )
         _ = self._exec(intronic_cmd, 'intronIC run failed:')
         ## now, prepare the final file
@@ -566,7 +570,7 @@ class InputProducer(CommandLineManager):
                     chrom, start, end, _, _, strand = intron2coords[name]
                     start = int(start)
                     end = int(end)
-                    strand: bool = data[5] == '+'
+                    strand: bool = strand == '+'
                     if end - start < self.min_intron_length_cesar:
                         continue
                     intron_key: Tuple[str, int, int, bool] = (chrom, start, end, strand)
@@ -639,7 +643,7 @@ class InputProducer(CommandLineManager):
                     seq = seq.upper().strip('\n')
                     intron_class, canon = self.intron2class[num]
                     ## update the respective CESAR2 profile
-                    self._update_profile(seq, intron_class, canon, site_type)
+                    self._update_profile(seq, intron_class, canon, site_type, num)
                     seq = ''
                 header = line[1:]
             else:
@@ -649,7 +653,7 @@ class InputProducer(CommandLineManager):
             seq = seq.upper()
             intron_class, canon = self.intron2class[num]
             ## again, update the respective profile for the final item
-            self._update_profile(seq, intron_class, canon, site_type)
+            self._update_profile(seq, intron_class, canon, site_type, num)
 
         ## step 3: compute the letter probabilities per position from the recorded frequencies
         ## and write the resulting profiles
@@ -695,7 +699,9 @@ class InputProducer(CommandLineManager):
             self._rmdir(self.tmp_dir)
 
 
-    def _update_profile(self, seq: str, intron_class: str, canon: bool, site: str) -> None:
+    def _update_profile(
+        self, seq: str, intron_class: str, canon: bool, site: str, num: str
+    ) -> None:
         """
         Updates the CESAR2 profile with respect to spliceosomal class, 'canonicity', and splice site
         """
