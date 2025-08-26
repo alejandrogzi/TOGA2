@@ -16,6 +16,10 @@ PYTHON_DIR: str = get_upper_dir(__file__, 2)
 EXEC_SCRIPT: str = os.path.abspath(PYTHON_DIR, 'predict_with_spliceai.py')
 CONTIG_SIZE_SCRIPT: str = os.path.join(PYTHON_DIR, 'get_contig_sizes.py')
 
+DEFAULT_CHUNK_SIZE: int = 6_000_000
+DEFAULT_FLANK_SIZE: int = 50_000
+DEFAULT_MIN_CONTIG_SIZE: int = 500
+
 DONOR_PLUS: str = 'spliceAiDonorPlus.bw'
 DONOR_MINUS: str = 'spliceAiDonorMinus'
 ACC_PLUS: str = 'spliceAiAcceptorPlus'
@@ -28,6 +32,7 @@ class SpliceAiManager(CommandLineManager):
         'output', 'tmp_dir',
         'twobit', 'chunk_size', 'flank_size',
         'min_contig_size', 'round_to', 'min_prob',
+        'job_num',
         'bed_dir', 'job_file'
 
         'v'
@@ -36,14 +41,23 @@ class SpliceAiManager(CommandLineManager):
     def __init__(
         self,
         ref_2bit: click.Path,
-        output: click.Path,
+        output: Optional[click.Path],
         chunk_size: Optional[int],
         flank_size: Optional[int],
         min_contig_size: Optional[int],
         round_to: Optional[int],
         min_prob: Optional[float],
+        job_number: Optional[int],
+        parallel_strategy: Optional[str],
+        nextflow_exec_script: Optional[click.Path],
+        max_number_of_retries: Optional[int],
+        nextflow_config_file: Optional[click.Path],
+        max_parallel_time: Optional[int],
+        cluster_queue_name: Optional[str],
         twobittofa_binary: Optional[click.Path],
-        keep_temporary: Optional[bool],
+        fatotwobit_binary: Optional[click.Path],
+        wigtobigwig_binary: Optional[click.Path],
+        keep_temporary_files: Optional[bool],
         verbose: Optional[bool]
     ) -> None:
         self.v: bool = verbose
@@ -66,6 +80,8 @@ class SpliceAiManager(CommandLineManager):
         self.round_to: int = round_to
         self.min_prob: float = min_prob
 
+        self.job_num: int = job_number
+
         self.bed_dir: str = os.path.jon(self.tmp_dir, 'bed_input')
         self.job_list: str = os.path.join(self.tmp_dir, 'joblist')
         self._mkdir(self.bed_dir)
@@ -73,7 +89,7 @@ class SpliceAiManager(CommandLineManager):
         self._mkdir(self.output)
         self._mkdir(self.tmp_dir)
         self.run()
-        if not keep_temporary:
+        if not keep_temporary_files:
             self._rmdir(self.tmp_dir)
 
     def run(self) -> None:
@@ -97,7 +113,7 @@ class SpliceAiManager(CommandLineManager):
         cmd: str = (
             'set -eu; set -o pipefail; '
             f'{self.twobittofa_binary} {self.twobit} stdout | '
-            f'sed \'^>!s/[BD-FH-SU-Z]/A/Ig\' | tee {self.tmp_fa} |'
+            f'sed \'/^>/!s/[BD-FH-SU-Z]/A/Ig\' | tee {self.tmp_fa} |'
             f'{CONTIG_SIZE_SCRIPT} - {self.chrom_sizes}'
         )
         _ = self._exec(cmd, 'Genome unmasking & contig size retrieval failed:')

@@ -80,6 +80,9 @@ spliceai_options: PrettyGroup = PrettyGroup(
         'SpliceAI use for exon annotation, splice site correction, and intron gain search'
     )
 )
+spliceai_run_options: PrettyGroup = PrettyGroup(
+    'SpliceAI settings', help=('SpliceAI and SpliceAI wrapper options')
+)
 annot_options: PrettyGroup = PrettyGroup(
     'Annotation', help='Post-CESAR gene annotation & mutation check settings'
 )
@@ -103,11 +106,15 @@ legacy_and_experimental: PrettyGroup = PrettyGroup(
 verbosity_options: PrettyGroup = PrettyGroup(
     'Verbosity', help='Verbosity & notifications controls'
 )
+binary_options: PrettyGroup = PrettyGroup(
+    'Executables', help=('Auxiliary executables & third party software')
+)
 out_options: PrettyGroup = PrettyGroup('Output')
 misc_options: PrettyGroup = PrettyGroup('Miscellaneous')
 
 
 @click.group(context_settings=CONTEXT_SETTINGS, no_args_is_help=True)
+@click.version_option(__version__, '--version', '-V', prog_name='TOGA2')
 def toga2() -> None:
     """
     \b
@@ -1386,7 +1393,7 @@ def from_config(config_file: click.File, override: Optional[str]) -> None:
 )
 @click.option(
     '--min_intron_length_intronic',
-    type=click.IntrRange(min=1),
+    type=click.IntRange(min=1),
     metavar='INT',
     default=MIN_INTRON_LENGTH_FOR_CLASSIFICATION,
     show_default=True,
@@ -1476,8 +1483,188 @@ def prepare_input(**kwargs) -> None:
     type=click.Path(exists=True),
     metavar='QUERY_2BIT'
 )
+@spliceai_run_options.option(
+    '--chunk_size',
+    '-c',
+    type=click.IntRange(min=1),
+    metavar='INT',
+    default=6000000,
+    show_default=True,
+    help=(
+        'Sequence chunk size for parallel SpliceAi annotation jobs, in bp. '
+        'Each contig (scaffold, chromosome, etc.) in the genome file is split into chunks '
+        'of the specified size to facilitate parallel computation'
+    )
+)
+@spliceai_run_options.option(
+    '--flank_size',
+    '-f',
+    type=click.IntRange(min=1),
+    metavar='INT',
+    default=50000,
+    show_default=True,
+    help=(
+        'Sequence chunk flank size, in bp. Each sequence chunk is furher added this many '
+        'nucleotides from each side overlapping neighbouring chunks to mititgate '
+        'potential boundary effects'
+    )
+)
+@spliceai_run_options.option(
+    '--min_contig_size',
+    '-m',
+    type=click.IntRange(min=1),
+    metavar='INT',
+    default=500,
+    show_default=True,
+    help=(
+        'Minimal contig (scaffold, chromosome, etc.) size fo consider for SpliceAI annotation'
+    )
+)
+@spliceai_run_options.option(
+    '--round_to',
+    type=click.IntRange(min=1),
+    metavar='INT',
+    default=4,
+    show_default=True,
+    help=(
+        'Number of decimal digits to round SpliceAI predicted probabilities to'
+    )
+)
+@spliceai_run_options.option(
+    '--min_prob',
+    type=click.FloatRange(min=0.0, max=1.0),
+    metavar='FLOAT',
+    default=.001,
+    show_default=True,
+    help=(
+        'Minimal SpliceAI-predicted probability to consider. Values lower than this '
+        'will not be reported in the output bigWig files'
+    )
+)
+@parallel_options.option(
+    '--job_num',
+    '-j',
+    type=click.IntRange(min=1),
+    metavar='INT',
+    default=500,
+    show_default=True,
+    help=(
+        'Number of parallel jobs to split the task into'
+    )
+)
+@parallel_options.option(
+    '--parallel_strategy',
+    '-s',
+    type=click.Choice(Constants.ALL_PARALLEL_EXECS),
+    metavar='PARALLEL_EXECUTOR',
+    default='local',
+    show_default=True,
+    help=(
+        """Specify the HPC strategy. By default, TOGA2 uses Nextflow to handle 
+        parallel processes and supports, at least in theory, all Nextflow executors. 
+        Please consult the full list of options at Nextflow help page. Note that setting 
+        executor to "local" will parallel the processes over the local machine CPUs.\b\n
+        If you want to use Parasol as parallel process manager, set this option to "para"\b
+        If you want to implement a fully custom parallel manager strategy, modify the CustomStrategy class 
+        and set this option to "custom" or contact the TOGA2 team
+        """
+    )
+)
+@parallel_options.option(
+    '--nextflow_exec_script',
+    type=click.Path(exists=True),
+    metavar='NEXTFLOW_SCRIPT_PATH',
+    default=None,
+    show_default=True,
+    help=(
+        'A path to a user-defined Nextflow script used for parallel process execution. '
+        'If not specified, TOGA2 will use a minimal boilerplate script instead. '
+        'Ignored if Parasol or custom HPC strategy were specified for parallel steps'
+    )
+)
+@parallel_options.option(
+    '--max_number_of_retries',
+    type=click.IntRange(min=1),
+    metavar='INT',
+    default=3,
+    show_default=True,
+    help=(
+        'Maximum number of retries per parallel job before reporting job failure. '
+        'Ignored if Parasol or custom HPC strategy were specified for parallel steps'
+    )
+)
+@parallel_options.option(
+    '--nextflow_config_file',
+    '-nc',
+    type=click.Path(exists=True),
+    metavar='NEXTFLOW_CONFIG_DIR',
+    default=None,
+    show_default=True,
+    help=(
+        'A path to a custom Nextflow configuration file. Settings in this file '
+        'will override those provided via command line'
+    )
+)
+@parallel_options.option(
+    '--max_parallel_time',
+    '-max_t',
+    type=click.IntRange(min=1),
+    metavar='HOURS',
+    default=24,
+    show_default=True,
+    help='Maximum time duration (in hours) for Nextflow parallel processes'
+)
+@parallel_options.option(
+    '--cluster_queue_name',
+    '-q',
+    type=str,
+    metavar='QUEUE_NAME',
+    default='batch',
+    show_default=True,
+    help=(
+        'Cluster partition/queue name used. Default value assumes that name '
+        '"batch" is available on your machine. Please consult your cluster '
+        'administrator for available and recommended queues'
+    )
+)
+@binary_options.option(
+    '--twobittofa_binary',
+    type=click.Path(exists=True)
+)
+@binary_options.option(
+    '--fatotwobit_binary',
+    type=click.Path(exists=True)
+)
+@binary_options.option(
+    '--wigtobigwig_binary',
+    type=click.Path(exists=True)
+)
+@out_options.option(
+    '--output',
+    '-o',
+    type=click.Path(exists=False),
+    metavar='PATH',
+    default=None,
+    show_default=True,
+    help='A path to save the results to [default: spliceai_<date_time>]'
+)
+@out_options.option(
+    '--keep_temporary_files',
+    '-k',
+    is_flag=True,
+    default=False,
+    show_default=True
+)
+@verbosity_options.option(
+    '--verbose',
+    '-v',
+    is_flag=True,
+    default=False,
+    show_default=True,
+    help='Controls execution verbosity; if set, progress log will be repeated to stdout'
+)
 
-def spliceai() -> None:
+def spliceai(**kwargs) -> None:
     """
     \b
     MMP""MM""YMM   .g8""8q.     .g8\"""bgd      db          `7MMF'`7MMF'
