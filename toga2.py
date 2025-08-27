@@ -31,6 +31,7 @@ __credits__ = ('Bogdan M. Kirilenko', 'Michael Hiller')
 logging.basicConfig(level=logging.INFO)
 
 LOCATION: str = os.path.dirname(os.path.abspath(__file__))
+BIN: str = os.path.join(LOCATION, 'bin')
 
 HG38_CANON_U2_ACCEPTOR: str = os.path.join(LOCATION, *HG38_CANON_U2_ACCEPTOR)
 HG38_CANON_U2_DONOR: str = os.path.join(LOCATION, *HG38_CANON_U2_DONOR)
@@ -664,17 +665,6 @@ def toga2() -> None:
     )
 )
 @spliceai_options.option(
-    '--bigwig2wig_binary',
-    '-bw2w',
-    type=click.Path(exists=True),
-    metavar='BIGWIG2WIG_BINARY',
-    default=None,
-    help=(
-        'A path to the UCSC bigWigToWig binary; if none is provided, '
-        'the utility will be sought for in $PATH under its default name'
-    )
-)
-@spliceai_options.option(
     '--spliceai_correction_mode',
     '-scm',
     type=click.IntRange(min=0, max=7),
@@ -1174,22 +1164,34 @@ def toga2() -> None:
         'A path to mailx executable; if not set, the executable with this name will be sought for in $PATH'
     )
 )
-@misc_options.option(
+## TODO: Path to bedToBigBed and ixIxx also go here
+@binary_options.option(
+    '--bigwig2wig_binary',
+    '-bw2w',
+    type=click.Path(exists=True),
+    metavar='BIGWIG2WIG_BINARY',
+    default=os.path.join(BIN, 'bigWigToWig'),
+    help=(
+        'A path to the UCSC bigWigToWig binary; if none is provided, '
+        'the utility will be sought for in $PATH under its default name'
+    )
+)
+@binary_options.option(
     '--fatotwobit_binary',
     type=click.Path(exists=True),
     metavar='FATOTWOBIT_PATH',
-    default=None,
+    default=os.path.join(BIN, 'faToTwoBit'),
     show_default=True,
     help=(
         'A path to UCSC faToTwoBit executable; if not set, the executable with this name '
         'will be sought for in $PATH'
     )
 )
-@misc_options.option(
+@binary_options.option(
     '--twobittofa_binary',
     type=click.Path(exists=True),
     metavar='TWOBITTOFA_PATH',
-    default=None,
+    default=os.path.join(BIN, 'twoBitToFa'),
     show_default=True,
     help=(
         'A path to UCSC twoBitToFa executable; if not set, the executable with this name '
@@ -1542,7 +1544,7 @@ def prepare_input(**kwargs) -> None:
     )
 )
 @parallel_options.option(
-    '--job_num',
+    '--job_number',
     '-j',
     type=click.IntRange(min=1),
     metavar='INT',
@@ -1629,15 +1631,27 @@ def prepare_input(**kwargs) -> None:
 )
 @binary_options.option(
     '--twobittofa_binary',
-    type=click.Path(exists=True)
+    type=click.Path(exists=True),
+    metavar='PATH',
+    default=os.path.join(BIN, 'twoBitToFa'),
+    show_default=True,
+    help='A path to UCSC twoBitToFa binary'
 )
 @binary_options.option(
     '--fatotwobit_binary',
-    type=click.Path(exists=True)
+    type=click.Path(exists=True),
+    metavar='PATH',
+    default=os.path.join(BIN, 'faToTwoBit'),
+    show_default=True,
+    help='A path to UCSC faToTwoBit binary'
 )
 @binary_options.option(
     '--wigtobigwig_binary',
-    type=click.Path(exists=True)
+    type=click.Path(exists=True),
+    metavar='PATH',
+    default=os.path.join(BIN, 'wigToBigWig'),
+    show_default=True,
+    help='A path to UCSC wigToBigWigs binary'
 )
 @out_options.option(
     '--output',
@@ -1679,6 +1693,8 @@ def spliceai(**kwargs) -> None:
     spliceai - Predict putative splice sites in the query assembly with SpliceAI
     NOTE: This mode is currently under development.
     """
+    from src.python.modules.spliceai_manager import SpliceAiManager
+    SpliceAiManager(**kwargs)
 
 
 

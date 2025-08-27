@@ -2,7 +2,7 @@ ARCH=$(shell uname -m)
 CHECK_DEPS=check_dependencies.py
 DELIM="=============================="
 MAIN=toga2.py
-EXEC_SCRIPTS=cesar_exec.py cesar_preprocess.py classify_chains.py feature_extractor.py get_contig_sizes.py train_model.py
+EXEC_SCRIPTS=cesar_exec.py cesar_preprocess.py classify_chains.py feature_extractor.py get_contig_sizes.py predict_with_spliceai.py train_model.py
 EXEC_MODULES=chain_bst_index.py get_names_from_bed.py
 VENV ?= false
 VENV_NAME ?= toga2
