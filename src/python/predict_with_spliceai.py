@@ -155,10 +155,10 @@ class SpliceAiRunner(CommandLineManager):
         self.round_to: int = round_to
         self.min_prob: float = min_prob
         
-        self.acc_plus_file: str = os.path.join(output, f'{hex_code()}_acceptorPlus.wig')
-        self.do_plus_file: str = os.path.join(output, f'{hex_code()}_donorPlus.wig')
-        self.acc_minus_file: str = os.path.join(output, f'{hex_code()}_acceptorMinus.wig')
-        self.do_minus_file: str = os.path.join(output, f'{hex_code()}_donorMinus.wig')
+        self.acc_plus_file: str = os.path.join(output, f'{hex_code()}AcceptorPlus.wig')
+        self.do_plus_file: str = os.path.join(output, f'{hex_code()}DonorPlus.wig')
+        self.acc_minus_file: str = os.path.join(output, f'{hex_code()}AcceptorMinus.wig')
+        self.do_minus_file: str = os.path.join(output, f'{hex_code()}DonorMinus.wig')
 
         self.twobittofa_binary: Union[str, None] = twobittofa_binary
         self.wigtobigwig_binary: Union[str, None] = wigtobigwig_binary
@@ -272,7 +272,7 @@ class SpliceAiRunner(CommandLineManager):
                         start_index: int = start_offset
                         end_index: int = len(seq) - end_offset
                         ## write the headers to the Wiggle files
-                        wiggle_header: str = WIGGLE_HEADER_TEMPLATE.format(chrom, start)
+                        wiggle_header: str = WIGGLE_HEADER_TEMPLATE.format(chrom, start + 1)
                         if strand:
                             aph.write(wiggle_header)
                             dph.write(wiggle_header)
@@ -361,7 +361,7 @@ class SpliceAiRunner(CommandLineManager):
                 start_index: int = start_offset
                 end_index: int = len(seq) - end_offset
                 ## write the headers to the Wiggle files
-                wiggle_header: str = WIGGLE_HEADER_TEMPLATE.format(chrom, start)
+                wiggle_header: str = WIGGLE_HEADER_TEMPLATE.format(chrom, start + 1)
                 if strand:
                     aph.write(wiggle_header)
                     dph.write(wiggle_header)

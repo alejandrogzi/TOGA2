@@ -32,6 +32,7 @@ logging.basicConfig(level=logging.INFO)
 
 LOCATION: str = os.path.dirname(os.path.abspath(__file__))
 BIN: str = os.path.join(LOCATION, 'bin')
+POSTOGA_DIR: str = os.path.join(LOCATION, 'postoga')
 
 HG38_CANON_U2_ACCEPTOR: str = os.path.join(LOCATION, *HG38_CANON_U2_ACCEPTOR)
 HG38_CANON_U2_DONOR: str = os.path.join(LOCATION, *HG38_CANON_U2_DONOR)
@@ -1692,16 +1693,43 @@ def spliceai(**kwargs) -> None:
     \b
     spliceai - Predict putative splice sites in the query assembly with SpliceAI
     NOTE: This mode is currently under development.
+
+    TOGA2 uses SpliceAI predictions for the query genome to improve exon annotation and record 
+    unique evolutionary events, such as distant splice site shifts and intron gains, in the query. 
+    To learn more on how TOGA2 uses SpliceAI predictions, consult `toga2.py cookbook` or GitHub Wiki page.
+
+    NOTE: TOGA2 does not invoke SpliceAI during runtime and relies on predictions provided beforehand. If you want 
+    to improve your TOGA2 annotation results with SpliceAI data, please run this mode for query genome or constul 
+    GitHub Wiki page for alternative solutions.
     """
     from src.python.modules.spliceai_manager import SpliceAiManager
     SpliceAiManager(**kwargs)
 
+@toga2.command(
+    context_settings=CONTEXT_SETTINGS,
+    no_args_is_help=True,
+    short_help='Run postprocessing analysis with Postoga'
+)
+def postoga() -> None:
+    """
+    \b
+    MMP""MM""YMM   .g8""8q.     .g8\"""bgd      db          `7MMF'`7MMF'
+    P'   MM   `7 .dP'    `YM. .dP'     `M     ;MM:           MM    MM  
+         MM     dM'      `MM dM'       `     ,V^MM.          MM    MM  
+         MM     MM        MM MM             ,M  `MM          MM    MM  
+         MM     MM.      ,MP MM.    `7MMF'  AbmmmqMA         MM    MM  
+         MM     `Mb.    ,dP' `Mb.     MM   A'     VML        MM    MM  
+       .JMML.     `"bmmd"'     `"bmmmdPY .AMA.   .AMMA.    .JMML..JMML.
 
+    \b
+    postoga - Invoke Postoga for in-depth analysis of TOGA2 results
+    NOTE: This mode is currently under development.
+    """
 
 @toga2.command(
     context_settings=CONTEXT_SETTINGS, 
     no_args_is_help=True, 
-    short_help="List example commands for 'run' mode"
+    short_help='List example commands for \'run\' mode'
 )
 
 def cookbook() -> None:

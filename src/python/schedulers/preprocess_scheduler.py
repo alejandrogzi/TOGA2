@@ -12,11 +12,10 @@ from math import ceil
 from pathlib import Path
 from modules.shared import CommandLineManager, get_upper_dir, CONTEXT_SETTINGS, SPLIT_JOB_HEADER
 from shutil import which
-from typing import Dict, List, Optional, Union
+from typing import Dict, List, Optional, Tuple, Union
 
 import click
 import os
-import sys
 
 TOGA2_ROOT: str = get_upper_dir(__file__, 4)
 LOCATION: str = os.path.dirname(os.path.abspath(__file__))
@@ -682,8 +681,10 @@ class PreprocessingScheduler(CommandLineManager):
     metavar='FLOAT',
     default=None,
     show_default=True,
-    help='Upper memory limit for CESAR jobs. If limit is exceeded, the program '
-         'terminates with zero exit status'
+    help=(
+        'Upper memory limit for CESAR jobs. If limit is exceeded, the program '
+        'terminates with zero exit status'
+    )
 )
 @click.option(
     '--max_space_size',
@@ -709,8 +710,10 @@ class PreprocessingScheduler(CommandLineManager):
     type=click.FloatRange(min=0.0, max=1.0),
     metavar='FLOAT',
     default=0.0,
-    help='Minimal fraction of reference CDS to be covered by alignment data. '
-         'Projections covering less than this portion will be discarded.'
+    help=(
+        'Minimal fraction of reference CDS to be covered by alignment data. '
+        'Projections covering less than this portion will be discarded.'
+    )
 )
 @click.option(
     '--exon_locus_flank',

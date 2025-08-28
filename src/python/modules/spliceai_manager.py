@@ -4,6 +4,11 @@
 SpliceAI prediction wrapper
 """
 
+from .constants import Constants
+from .parallel_jobs_manager import (
+    CustomStrategy, NextflowStrategy, 
+    ParaStrategy, ParallelJobsManager
+)
 from .shared import CommandLineManager, dir_name_by_date, get_upper_dir
 from collections import defaultdict
 from heapq import heappop, heappush
@@ -26,6 +31,11 @@ DEFAULT_MIN_CONTIG_SIZE: int = 500
 
 STRANDS: Tuple[str, str] = ('+', '-')
 
+FILE_NAME_TEMPLATES: Tuple[str] = (
+    'AcceptorPlus', 'AcceptorMinus',
+    'DonorPlus', 'DonorMinus'
+)
+
 DONOR_PLUS: str = 'spliceAiDonorPlus.bw'
 DONOR_MINUS: str = 'spliceAiDonorMinus'
 ACC_PLUS: str = 'spliceAiAcceptorPlus'
@@ -35,14 +45,17 @@ class SpliceAiManager(CommandLineManager):
     """
     """
     __slots__ = (
-        'output', 'tmp_dir',
+        'output', 'tmp_dir', 'nextflow_dir',
         'twobit', 'chunk_size', 'flank_size',
         'min_contig_size', 'round_to', 'min_prob',
-        'job_num',
-        'bed_dir', 'job_file', 'job_list',
+        'project_name', 'job_num', 'parallel_strategy',
+        'nextflow_exec_script', 'max_number_of_retries', 
+        'nextflow_config_file', 'max_parallel_time', 
+        'cluster_queue_name',
+        'bed_dir', 'job_file', 'job_list', 'chunk_num',
         'tmp_fa', 'unmasked_twobit', 'chrom_sizes',
         'twobittofa_binary', 'fatotwobit_binary', 'wigtobigwig_binary',
-        'v', 'log_file'
+        'v', 'log_file', 'keep_tmp'
     )
 
     def __init__(
@@ -68,15 +81,17 @@ class SpliceAiManager(CommandLineManager):
         verbose: Optional[bool]
     ) -> None:
         self.v: bool = verbose
-        project_name: str = dir_name_by_date('spliceai')
+        self.project_name: str = dir_name_by_date('spliceai')
         self.output: str = (
             self._abspath(output) if output is not None else 
-            self._abspath(project_name)
+            self._abspath(self.project_name)
         )
         self._mkdir(self.output)
-        self.tmp_dir: str = os.path.join(self.output, f'tmp_{project_name}')
-        self.log_file: str = os.path.join(self.output, f'{project_name}.txt')
+        self.tmp_dir: str = os.path.join(self.output, f'tmp_{self.project_name}')
+        self.nextflow_dir: str = os.path.join(self.tmp_dir, 'nextflow')
+        self.log_file: str = os.path.join(self.output, f'{self.project_name}.txt')
         self.set_logging()
+        self.logger.propagate = False
 
         self.twobit: click.Path = query_2bit
 
@@ -97,6 +112,13 @@ class SpliceAiManager(CommandLineManager):
         self.min_prob: float = min_prob
 
         self.job_num: int = job_number
+        self.parallel_strategy: str = parallel_strategy
+        self.nextflow_exec_script: str = nextflow_exec_script
+        self.max_number_of_retries: int = max_number_of_retries
+        self.nextflow_config_file: str = nextflow_config_file
+        self.max_parallel_time: int = max_parallel_time
+        self.cluster_queue_name: str = cluster_queue_name
+        self.chunk_num: int = 0
 
         self.bed_dir: str = os.path.join(self.tmp_dir, 'bed_input')
         self.job_list: str = os.path.join(self.tmp_dir, 'joblist')
@@ -107,10 +129,12 @@ class SpliceAiManager(CommandLineManager):
         self.twobittofa_binary: Union[str, None] = twobittofa_binary
         self.fatotwobit_binary: Union[str, None] = fatotwobit_binary
         self.wigtobigwig_binary: Union[str, None] = wigtobigwig_binary
+        self.keep_tmp: bool = keep_temporary_files
 
         self._mkdir(self.output)
         self._mkdir(self.tmp_dir)
         self._mkdir(self.bed_dir)
+        self._mkdir(self.nextflow_dir)
 
         self.run()
 
@@ -249,11 +273,12 @@ class SpliceAiManager(CommandLineManager):
         ## remove the hefty list
         del job_heap
         ## write the resulting jobs
-        chunk_num: int = 0
         job_list: List[str] = []
         ## write input for each bin in Bed6 format
         for bucket, intervals in bin2chunks.items():
-            bed_file: str = os.path.join(self.bed_dir, f'batch{chunk_num}.bed')
+            if not intervals:
+                continue
+            bed_file: str = os.path.join(self.bed_dir, f'batch{self.chunk_num}.bed')
             with open(bed_file, 'w') as h:
                 for interval in intervals:
                     ## record each chunk twice, once for each strand
@@ -273,20 +298,84 @@ class SpliceAiManager(CommandLineManager):
                 f'--wigtobigwig_binary {self.wigtobigwig_binary}'
             )
             job_list.append(cmd)
+            self.chunk_num += 1
         with open(self.job_list, 'w') as h:
             for job in job_list:
                 h.write(job + '\n')
 
     def run_jobs(self) -> None:
         """
-        Controls parallel job execution
+        Controls parallel job execution.
+        This is a medley of parallel execution-related methods from toga_main.py
+        simplified for the needs of the SpliceAI annotaiton mode.
         """
-        pass
+        ## get parallel process manager based on the requested strategy
+        if self.parallel_strategy == 'para':
+            strategy = ParaStrategy()
+        elif self.parallel_strategy == 'custom':
+            strategy = CustomStrategy()
+        else:
+            strategy = NextflowStrategy()
+        job_manager: ParallelJobsManager = ParallelJobsManager(strategy)
+        local_executor: bool = self.parallel_strategy == 'local'
+
+        ## generate Nextflow configuration fil
+        if self.nextflow_config_file is None:
+            nf_contents: str = Constants.NEXTFLOW_STUB.format(self.max_number_of_retries)
+            nf_file: str = os.path.join(self.nextflow_dir, 'execute_joblist.nf')
+            self.nextflow_exec_script = nf_file
+            with open(nf_file, 'w') as h:
+                h.write(nf_contents + '\n')
+
+        project_name: str = self.project_name
+        project_path: str = os.path.join(self.nextflow_dir, project_name)
+        manager_data: Dict[str, str] = {
+            'project_name': project_name,
+            'project_path': project_path,
+            'logs_dir': project_path,
+            'nextflow_dir': self.nextflow_dir,
+            'NF_EXECUTE': self.nextflow_exec_script,
+            'local_executor': local_executor,
+            'keep_nf_logs': self.keep_tmp,
+            # 'nexflow_config_file': nextflow_config,
+            'nextflow_config_dir': self.nextflow_dir,
+            'temp_wd': self.tmp_dir,
+            'queue_name': self.cluster_queue_name,
+            'logger': self.logger
+        }
+        if self.nextflow_config_file is not None:
+            manager_data['nexflow_config_file'] = self.nextflow_config_file
+        try:
+            job_manager.execute_jobs(
+                self.job_list,
+                manager_data,
+                project_name,
+                wait=True,
+                memory_limit=5, ## TODO: Potentially should be set to custom values 
+                queue_name=self.cluster_queue_name,
+                clean=self.keep_tmp,
+                cpu=1,
+                process_num=self.chunk_num + 1,
+                executor=self.parallel_strategy
+            )
+        except KeyboardInterrupt:
+            # TogaUtil.terminate_parallel_processes([job_manager])
+            self._to_log('Aborting the parallel step', 'warning')
+            job_manager.terminate_process()
         
     def aggregate_jobs(self) -> None:
         """
         Aggregates individual job results and converts them into into bigWig format,
         one per each splice site and each strand
         """
-        pass
+        self._to_log('Aggregating SpliceAI prediction results')
+        for template in FILE_NAME_TEMPLATES:
+            final_file: str = os.path.join(self.output, f'spliceAi{template}.bw')
+            stub_path: str = os.path.join(self.tmp_dir, f'*{template}.wig')
+            tmp_aggr_wig: str = os.path.join(self.tmp_dir, f'spliceAi{template}.wig')
+            cmd: str = (
+                f'cat {stub_path} > {tmp_aggr_wig} && '
+                f'{self.wigtobigwig_binary} {tmp_aggr_wig} {self.chrom_sizes} {final_file}'
+            )
+            _ = self._exec(cmd, 'File aggregation for %s failed:' % template)
 

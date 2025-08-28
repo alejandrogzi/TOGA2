@@ -142,7 +142,24 @@ class NextflowStrategy(ParallelizationStrategy):
                 cwd=self.nf_project_path
             )
         if wait:
-            self._process.wait()
+            try:
+                self._process.wait()
+            except KeyboardInterrupt:
+                self.terminate_process()
+                self.logger.warning('Exiting due to parallel step keyboard interrupt')
+                sys.exit(0)
+
+    def terminate_process(self):
+        """Terminates the associated process"""
+        if not self._process:
+            return
+        pid: int = self._process.pid
+        try:
+            os.kill(pid, signal.SIGTERM)
+            self.logger.warning('Nextflow process %s successfully interrupted' % self.label)
+        except ProcessLookupError:
+            self.logger.warning('Nextflow process %s does not exist and was likely aborted' % self.label)
+        ## TODO: Test whether Slurm/LSF jobs are actually killed after that
 
     def _create_config_file(self) -> Union[str, None]:
         """Generates a configuration file for the scheduled Nextflow process"""
@@ -281,7 +298,7 @@ class ParaStrategy(ParallelizationStrategy):
         pid: int = self._process.pid
         try:
             os.kill(pid, signal.SIGTERM)
-            self.logger.warning('Para process %s successfully finished' % self.label)
+            self.logger.warning('Para process %s successfully interrupted' % self.label)
         except ProcessLookupError:
             self.logger.warning('Para process %s does not exist and was likely aborted' % self.label)
         self.logger.warning('Stopping the Para batch')
