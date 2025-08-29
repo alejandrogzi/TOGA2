@@ -5,7 +5,15 @@ Schedules CESAR preprocessing jobs for optimal cluster performance
 """
 
 from collections import defaultdict
-from modules.cesar_wrapper_constants import *
+from modules.cesar_wrapper_constants import (
+    FLANK_SPACE,
+    HG38_CANON_U2_ACCEPTOR, HG38_CANON_U2_DONOR,
+    HG38_NON_CANON_U2_ACCEPTOR, HG38_NON_CANON_U2_DONOR,
+    HG38_CANON_U12_ACCEPTOR, HG38_CANON_U12_DONOR,
+    HG38_NON_CANON_U12_ACCEPTOR, HG38_NON_CANON_U12_DONOR,
+    FIRST_ACCEPTOR, LAST_DONOR,
+    MIN_ASMBL_GAP_SIZE,
+)
 from modules.constants import PRE_CLEANUP_LINE
 from heapq import heappop, heappush
 from math import ceil
@@ -589,8 +597,10 @@ class PreprocessingScheduler(CommandLineManager):
     metavar='TSV',
     default=None,
     show_default=True,
-    help='A two-column file containing fragmented (multi-chain) projections. '
-         'By default, TOGA saves these data to tmp/gene_fragments.tsv'
+    help=(
+        'A two-column file containing fragmented (multi-chain) projections. '
+        'By default, TOGA saves these data to tmp/gene_fragments.tsv'
+    )
 )
 
 @click.option(
@@ -609,9 +619,11 @@ class PreprocessingScheduler(CommandLineManager):
     metavar='INT',
     default=50,
     show_default=True,
-    help='A maximum number of projections per each preprocessing command. '
-         'Chains projecting the number of transcripts exceeding this number '
-         'will be split into multiple commands with balanced memory requirements. '
+    help=(
+        'A maximum number of projections per each preprocessing command. '
+        'Chains projecting the number of transcripts exceeding this number '
+        'will be split into multiple commands with balanced memory requirements. '
+    )
 )
 @click.option(
     '--max_chain_number',
@@ -641,8 +653,10 @@ class PreprocessingScheduler(CommandLineManager):
     is_flag=True,
     default=False,
     show_default=True,
-    help='If set, only transcript with a single orthologous projection '
-         'are considered'
+    help=(
+        'If set, only transcript with a single orthologous projection '
+        'are considered'
+    )
 )
 @click.option(
     '--parallel_execution',
@@ -662,8 +676,10 @@ class PreprocessingScheduler(CommandLineManager):
     is_flag=True,
     default=False,
     show_default=False,
-    help='If set, ignores spanning chains '
-         '(i.e. chains with no coding blocks corresponding to transcript exons)'
+    help=(
+        'If set, ignores spanning chains '
+        '(i.e. chains with no coding blocks corresponding to transcript exons)'
+    )
 )
 @click.option(
     '--no_inference',

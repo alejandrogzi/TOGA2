@@ -28,6 +28,7 @@ CONTIG_SIZE_SCRIPT: str = os.path.join(PYTHON_DIR, 'get_contig_sizes.py')
 DEFAULT_CHUNK_SIZE: int = 6_000_000
 DEFAULT_FLANK_SIZE: int = 50_000
 DEFAULT_MIN_CONTIG_SIZE: int = 500
+DEFAULT_MEMORY_LIMIT: int = 5
 
 STRANDS: Tuple[str, str] = ('+', '-')
 
@@ -51,7 +52,7 @@ class SpliceAiManager(CommandLineManager):
         'project_name', 'job_num', 'parallel_strategy',
         'nextflow_exec_script', 'max_number_of_retries', 
         'nextflow_config_file', 'max_parallel_time', 
-        'cluster_queue_name',
+        'cluster_queue_name', 'memory_limit',
         'bed_dir', 'job_file', 'job_list', 'chunk_num',
         'tmp_fa', 'unmasked_twobit', 'chrom_sizes',
         'twobittofa_binary', 'fatotwobit_binary', 'wigtobigwig_binary',
@@ -74,6 +75,7 @@ class SpliceAiManager(CommandLineManager):
         nextflow_config_file: Optional[click.Path],
         max_parallel_time: Optional[int],
         cluster_queue_name: Optional[str],
+        memory_limit: Optional[int],
         twobittofa_binary: Optional[click.Path],
         fatotwobit_binary: Optional[click.Path],
         wigtobigwig_binary: Optional[click.Path],
@@ -118,6 +120,7 @@ class SpliceAiManager(CommandLineManager):
         self.nextflow_config_file: str = nextflow_config_file
         self.max_parallel_time: int = max_parallel_time
         self.cluster_queue_name: str = cluster_queue_name
+        self.memory_limit: int = memory_limit
         self.chunk_num: int = 0
 
         self.bed_dir: str = os.path.join(self.tmp_dir, 'bed_input')
@@ -351,7 +354,7 @@ class SpliceAiManager(CommandLineManager):
                 manager_data,
                 project_name,
                 wait=True,
-                memory_limit=5, ## TODO: Potentially should be set to custom values 
+                memory_limit=self.memory_limit, ## TODO: Potentially should be set to custom values 
                 queue_name=self.cluster_queue_name,
                 clean=self.keep_tmp,
                 cpu=1,

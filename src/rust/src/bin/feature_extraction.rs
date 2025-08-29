@@ -44,7 +44,6 @@ struct Args {
 
 fn main() {
     let args = Args::parse();
-    // dummy values
     let chain_file = args.chain_file;
     // let chain_file = "/beegfs/projects/project-ymalovichko/toga_extension/duplication_tracing/TOGA2.0_tests/TREE_TESTS/HLanoCau1_iqtree_reduced_50/tmp/input_data/genome_alignment.chain";
     let bed_file = args.bed_file;

@@ -262,11 +262,8 @@ class SpliceAiRunner(CommandLineManager):
                         start_offset, end_offset = self.chunk2offsets[header]
                         x = one_hot_encode('N' * (context // 2) + seq + 'N' * (context // 2))[None, :]
                         y = np.mean([models[m].predict(x) for m in range(5)], axis=0)
-                        # print(f'{seq=}')
-                        # print(f'{x=}')
-                        # print(f'{y=}')
+
                         ## get probabilities for acceptor and donor sites
-                        # positional probabilities
                         acceptor_prob: np.ndarray = y[0, :, 1]
                         donor_prob: np.ndarray = y[0, :, 2]
                         start_index: int = start_offset
@@ -279,46 +276,56 @@ class SpliceAiRunner(CommandLineManager):
                         else:
                             amh.write(wiggle_header)
                             dmh.write(wiggle_header)
-                        ## process the results
-                        ## positive strand annotation is more straightforward
                         if strand:
-                            # if we start at coordinate zero we can't shift a null
-                            # => choose arbitrary value 0.0
-                            if start_index == 0:
-                                # print("Insert 1", file=sys.stderr)
-                                donor_prob = donor_prob[:end_index]
-                                donor_prob = np.insert(donor_prob, 0, 0.0)
-                                #donor_prob = np.insert(donor_prob, len(donor_prob)-1, 0.0)
-                            else:
-                                donor_prob = donor_prob[start_index - 1:end_index]
-
-                            # handle acceptors
-                            if end_offset == 0:
-                                acceptor_prob = acceptor_prob[start_index + 1:]
-                                acceptor_prob = np.insert(acceptor_prob, len(acceptor_prob) - 1, 0.0)
-                                #acceptor_prob = np.insert(acceptor_prob, len(acceptor_prob) - 1, 0.0)
-                            else:
-                                acceptor_prob = acceptor_prob[start_index + 1:end_index + 1]
-                        # negative strand requires some additional tweaks
+                            start_index: int = start_offset
+                            end_index: int = len(seq) - end_offset
+                            acceptor_prob = acceptor_prob[start_index:end_index]
+                            donor_prob = donor_prob[start_index:end_index]
                         else:
                             start_index: int = end_offset
                             end_index: int = len(seq) - start_offset
-                            # if we start at coordinate zero we can't shift a null
-                            # => choose arbitrary value 0.0
-                            if start_index == 0:
-                                acceptor_prob = acceptor_prob[start_index:end_index + 1][::-1]
-                                acceptor_prob = np.insert(acceptor_prob, 0, 0.0)
-                                #acceptor_prob = np.insert(acceptor_prob, len(acceptor_prob) - 1, 0.0)
-                            else:
-                                acceptor_prob = acceptor_prob[start_index - 1:end_index + 1][::-1]
+                            acceptor_prob = acceptor_prob[start_index:end_index][::-1]
+                            donor_prob = donor_prob[start_index:end_index][::-1]
+                        ## process the results
+                        ## positive strand annotation is more straightforward
+                        # if strand:
+                        #     # if we start at coordinate zero we can't shift a null
+                        #     # => choose arbitrary value 0.0
+                        #     if start_index == 0:
+                        #         # print("Insert 1", file=sys.stderr)
+                        #         donor_prob = donor_prob[:end_index]
+                        #         donor_prob = np.insert(donor_prob, 0, 0.0)
+                        #         #donor_prob = np.insert(donor_prob, len(donor_prob)-1, 0.0)
+                        #     else:
+                        #         donor_prob = donor_prob[start_index - 1:end_index]
 
-                            # handle donors
-                            if end_offset == 0:
-                                donor_prob = donor_prob[start_index + 1:end_index + 1][::-1]
-                                donor_prob = np.insert(donor_prob, len(donor_prob) - 1, 0.0)
-                                #donor_prob = np.insert(donor_prob, len(donor_prob) - 1, 0.0)
-                            else:
-                                donor_prob = donor_prob[start_index + 1:end_index + 1][::-1]
+                        #     # handle acceptors
+                        #     if end_offset == 0:
+                        #         acceptor_prob = acceptor_prob[start_index + 1:]
+                        #         acceptor_prob = np.insert(acceptor_prob, len(acceptor_prob) - 1, 0.0)
+                        #         #acceptor_prob = np.insert(acceptor_prob, len(acceptor_prob) - 1, 0.0)
+                        #     else:
+                        #         acceptor_prob = acceptor_prob[start_index + 1:end_index + 1]
+                        # # negative strand requires some additional tweaks
+                        # else:
+                        #     start_index: int = end_offset
+                        #     end_index: int = len(seq) - start_offset
+                        #     # if we start at coordinate zero we can't shift a null
+                        #     # => choose arbitrary value 0.0
+                        #     if start_index == 0:
+                        #         acceptor_prob = acceptor_prob[start_index:end_index + 1][::-1]
+                        #         acceptor_prob = np.insert(acceptor_prob, 0, 0.0)
+                        #         #acceptor_prob = np.insert(acceptor_prob, len(acceptor_prob) - 1, 0.0)
+                        #     else:
+                        #         acceptor_prob = acceptor_prob[start_index - 1:end_index + 1][::-1]
+
+                        #     # handle donors
+                        #     if end_offset == 0:
+                        #         donor_prob = donor_prob[start_index + 1:end_index + 1][::-1]
+                        #         donor_prob = np.insert(donor_prob, len(donor_prob) - 1, 0.0)
+                        #         #donor_prob = np.insert(donor_prob, len(donor_prob) - 1, 0.0)
+                        #     else:
+                        #         donor_prob = donor_prob[start_index + 1:end_index + 1][::-1]
 
                         ## process and write the resulting values
                         for i, x in enumerate(donor_prob):
@@ -358,8 +365,6 @@ class SpliceAiRunner(CommandLineManager):
                 # positional probabilities
                 acceptor_prob: np.ndarray = y[0, :, 1]
                 donor_prob: np.ndarray = y[0, :, 2]
-                start_index: int = start_offset
-                end_index: int = len(seq) - end_offset
                 ## write the headers to the Wiggle files
                 wiggle_header: str = WIGGLE_HEADER_TEMPLATE.format(chrom, start + 1)
                 if strand:
@@ -371,43 +376,44 @@ class SpliceAiRunner(CommandLineManager):
                 ## process the results
                 ## positive strand annotation is more straightforward
                 if strand:
+                    start_index: int = start_offset
+                    end_index: int = len(seq) - end_offset
                     # if we start at coordinate zero we can't shift a null
                     # => choose arbitrary value 0.0
-                    if start_index == 0:
-                        # print("Insert 1", file=sys.stderr)
-                        donor_prob = donor_prob[:end_index]
-                        donor_prob = np.insert(donor_prob, 0, 0.0)
-                        #donor_prob = np.insert(donor_prob, len(donor_prob)-1, 0.0)
-                    else:
-                        donor_prob = donor_prob[start_index - 1:end_index]
+                    # if start_index == 0:
+                    #     donor_prob = donor_prob[:end_index]
+                    #     donor_prob = np.insert(donor_prob, 0, 0.0)
+                    # else:
+                    #     donor_prob = donor_prob[start_index - 1:end_index]
 
-                    # handle acceptors
-                    if end_offset == 0:
-                        acceptor_prob = acceptor_prob[start_index + 1:]
-                        acceptor_prob = np.insert(acceptor_prob, len(acceptor_prob) - 1, 0.0)
-                        #acceptor_prob = np.insert(acceptor_prob, len(acceptor_prob) - 1, 0.0)
-                    else:
-                        acceptor_prob = acceptor_prob[start_index + 1:end_index + 1]
+                    # # handle acceptors
+                    # if end_offset == 0:
+                    #     acceptor_prob = acceptor_prob[start_index + 1:]
+                    #     acceptor_prob = np.insert(acceptor_prob, len(acceptor_prob) - 1, 0.0)
+                    # else:
+                    #     acceptor_prob = acceptor_prob[start_index + 1:end_index + 1]
+                    acceptor_prob = acceptor_prob[start_index:end_index]
+                    donor_prob = donor_prob[start_index:end_index]
                 # negative strand requires some additional tweaks
                 else:
                     start_index: int = end_offset
                     end_index: int = len(seq) - start_offset
                     # if we start at coordinate zero we can't shift a null
                     # => choose arbitrary value 0.0
-                    if start_index == 0:
-                        acceptor_prob = acceptor_prob[start_index:end_index + 1][::-1]
-                        acceptor_prob = np.insert(acceptor_prob, 0, 0.0)
-                        #acceptor_prob = np.insert(acceptor_prob, len(acceptor_prob) - 1, 0.0)
-                    else:
-                        acceptor_prob = acceptor_prob[start_index - 1:end_index + 1][::-1]
+                    # if start_index == 0:
+                    #     acceptor_prob = acceptor_prob[start_index:end_index + 1][::-1]
+                    #     acceptor_prob = np.insert(acceptor_prob, 0, 0.0)
+                    # else:
+                    #     acceptor_prob = acceptor_prob[start_index - 1:end_index + 1][::-1]
 
-                    # handle donors
-                    if end_offset == 0:
-                        donor_prob = donor_prob[start_index + 1:end_index + 1][::-1]
-                        donor_prob = np.insert(donor_prob, len(donor_prob) - 1, 0.0)
-                        #donor_prob = np.insert(donor_prob, len(donor_prob) - 1, 0.0)
-                    else:
-                        donor_prob = donor_prob[start_index + 1:end_index + 1][::-1]
+                    # # handle donors
+                    # if end_offset == 0:
+                    #     donor_prob = donor_prob[start_index + 1:end_index + 1][::-1]
+                    #     donor_prob = np.insert(donor_prob, len(donor_prob) - 1, 0.0)
+                    # else:
+                    #     donor_prob = donor_prob[start_index + 1:end_index + 1][::-1]
+                    acceptor_prob = acceptor_prob[start_index:end_index][::-1]
+                    donor_prob = donor_prob[start_index:end_index][::-1]
 
                 ## process and write the resulting values
                 for i, x in enumerate(donor_prob):

@@ -14,7 +14,9 @@ from src.python.modules.cesar_wrapper_constants import (
 )
 from src.python.modules.constants import TOGA2_EPILOG, Constants
 from src.python.modules.input_producer import (
-    MIN_INTRON_LENGTH_FOR_CLASSIFICATION, MIN_INTRON_LENGTH_FOR_PROFILES
+    DEFAULT_MEMORY_LIMIT,
+    MIN_INTRON_LENGTH_FOR_CLASSIFICATION, 
+    MIN_INTRON_LENGTH_FOR_PROFILES
 )
 from src.python.modules.shared import CONTEXT_SETTINGS, PrettyGroup
 from typing import List, Optional
@@ -1628,6 +1630,16 @@ def prepare_input(**kwargs) -> None:
         'Cluster partition/queue name used. Default value assumes that name '
         '"batch" is available on your machine. Please consult your cluster '
         'administrator for available and recommended queues'
+    )
+)
+@parallel_options.option(
+    '--memory_limit',
+    type=click.IntRange(min=1),
+    metavar='GB',
+    default=DEFAULT_MEMORY_LIMIT,
+    show_default=True,
+    help=(
+        'Memory limit for parallel SpliceAI jobs, in GB'
     )
 )
 @binary_options.option(

@@ -2437,6 +2437,14 @@ class TogaMain(CommandLineManager):
                         cleanup_cmd, f'ERROR: Cleanup failed for project {project}'
                     )
 
+    def intermediate_check(self, step: str) -> None:
+        """Checks results of a given step"""
+        pass
+
+    def get_summary(self) -> None:
+        """Prepares a summary file of all successfully completed steps"""
+        pass
+
     def notify_on_completion(self, step: str) -> None:
         """Generates and sends an e-mail notification on successful TOGA2 run"""
         body: str = Constants.SUCCESS_EMAIL.format(self.project_name, self.output)
