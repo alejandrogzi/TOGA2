@@ -100,15 +100,11 @@ install_python_packages:
 	echo ${DELIM}
 
 install_python:
-	python3 -m venv toga2 && \
-	source toga2/bin/activate && \
 	python3 -m pip install -r requirements.txt
 
 install_third_party:
-	source toga2/bin/activate
 	./${CHECK_DEPS} install_third_party
 
 train_models:
-	source toga2/bin/activate
 	src/python/train_model.py
 	echo ${DELIM}

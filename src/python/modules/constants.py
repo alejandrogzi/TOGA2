@@ -301,6 +301,10 @@ This is an automated notification on TOGA2 project {} hosted at directory {} \
 reporting the following warning at the {} step:\n{}
 """ + SANITY_CHECK_PS
 
+    ## default settings for 'test' mode
+    DEFAULT_CONFIG: str = os.path.join('supply', 'project_args.json')
+    DEFAULT_OUTPUT_DIR: str = 'sample_output'
+
 
 class ConstColors:
     BLUE = "0,0,200"

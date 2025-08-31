@@ -61,6 +61,7 @@ DEFAULT_BED2FRACTION: str = os.path.join(
 PROFILE_DIR: str = 'CESAR2.0_profiles'
 EQUI_ACC: str = 'equiprobable_acceptor.tsv'
 EQUI_DONOR: str = 'equiprobable_donor.tsv'
+DEFAULT_MEMORY_LIMIT: int = 24
 
 REJ_GENE: str = (
     'GENE\t{}\t0\tNo (valid) transcripts found in the reference annotation\tZERO_TRANSCRIPT_INPUT\tN'

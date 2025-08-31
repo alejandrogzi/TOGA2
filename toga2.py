@@ -35,6 +35,7 @@ logging.basicConfig(level=logging.INFO)
 LOCATION: str = os.path.dirname(os.path.abspath(__file__))
 BIN: str = os.path.join(LOCATION, 'bin')
 POSTOGA_DIR: str = os.path.join(LOCATION, 'postoga')
+TEST_DIR: str = os.path.join(LOCATION, 'test_input')
 
 HG38_CANON_U2_ACCEPTOR: str = os.path.join(LOCATION, *HG38_CANON_U2_ACCEPTOR)
 HG38_CANON_U2_DONOR: str = os.path.join(LOCATION, *HG38_CANON_U2_DONOR)
@@ -1765,11 +1766,26 @@ def cookbook() -> None:
 
 @toga2.command(
     context_settings=CONTEXT_SETTINGS, 
-    no_args_is_help=True, 
+    no_args_is_help=False, 
     short_help='Test TOGA2 with companion dataset'
 )
-def test() -> None:
-    pass
+@click.option(
+    '--output',
+    '-o',
+    type=click.Path(exists=False),
+    metavar='PATH',
+    default=Constants.DEFAULT_OUTPUT_DIR,
+    show_default=True,
+    help='A path to store the resutls in'
+)
+def test(output: Optional[click.Path]) -> None:
+    from src.python.modules.toga_configured import Toga2ConfiguredLauncher
+    from src.python.modules.toga_main import TogaMain
+    config_file: str = Constants.DEFAULT_CONFIG
+    override: str = f'-o {output} -v'
+
+    args: List[str] = Toga2ConfiguredLauncher(config_file, override=override).run()
+    TogaMain(**args)
 
 
 if __name__ == '__main__':

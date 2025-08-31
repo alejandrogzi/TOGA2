@@ -238,19 +238,19 @@ class IntronIcInstaller(Installer):
         ## clone from github
         dest: str = os.path.join(os.path.dirname(__file__), 'bin', 'intronIC')
         clone_cmd: str = f'git clone https://github.com/glarue/intronIC {dest}'
-        subprocess.call(clone_cmd, shell=True)
+        subprocess.run(clone_cmd, shell=True)
         minor_v: int = sys.version_info.minor
         if minor_v > PKG_MAX_VERSION:
             versioneer: str = os.path.join(dest, 'versioneer.py')
             sed_cmd: str = f"sed -i 's/SafeConfig/Config/g; s/readfp/read_file/g' {versioneer}"
-            subprocess.call(sed_cmd, shell=True)
+            subprocess.run(sed_cmd, shell=True)
 
 class PrankInstaller(Installer):
     def install():
         install_cmd: str = """git clone https://github.com/ariloytynoja/prank-msa.git bin/prank && \
     cd bin/prank/src && make && mv prank ../
 """
-        subprocess.call(install_cmd, shell=True)
+        subprocess.run(install_cmd, shell=True)
 
 class IqTree2Installer(Installer):
     def install():
@@ -260,7 +260,7 @@ wget -P bin/ https://github.com/iqtree/iqtree2/releases/download/v2.4.0/iqtree-2
     mv bin/iqtree-2.4.0-Linux-intel/bin/iqtree2 bin/ && \
     rm -rf bin/iqtree-2.4.0-Linux-intel bin/iqtree-2.4.0-Linux-intel.tar.gz
 """
-        subprocess.call(install_cmd)
+        subprocess.run(install_cmd, shell=True)
 
 INSTALLERS: Tuple[Installer] = (IntronIcInstaller, PrankInstaller, IqTree2Installer)
 
