@@ -23,12 +23,11 @@ clipped_exon_qlen\tclipped_intr_cover\n";
 struct Args {
     /// Reference annotation used as TOGA2 input, in BED12 format. Note that UTR annotations 
     /// must be preserved for precise feature estimation
-    #[arg(long, short = 'b', default_value_t = String::from("/beegfs/projects/project-ymalovichko/toga_extension/duplication_tracing/TOGA2.0_tests/TREE_TESTS/mm10_iqtree_reduced_50/tmp/input_data/reference_annotation.bed"))]//String::from("/projects/hillerlab/genome/gbdb-HL/hg38/TOGA2/currentAnnotation/hg38.toga.transcripts.bed"))]
+    #[arg(long, short = 'b')]
     bed_file: String,
 
-    /// Genome alignment chain file; might be gzip-compressed; for best performance, consider indexing it
-    /// with chaintools indexer (TODO: Chain indexing currently does not work properly)
-    #[arg(long, short = 'c', default_value_t = String::from("/beegfs/projects/project-ymalovichko/toga_extension/duplication_tracing/TOGA2.0_tests/TREE_TESTS/mm10_iqtree_reduced_50/tmp/input_data/genome_alignment.chain"))]
+    /// Genome alignment chain file; might be gzip-compressed
+    #[arg(long, short = 'c')]
     chain_file: String,
 
     /// [Optional] A two-column tab-separated file containing gene-to-transcript mapping, 

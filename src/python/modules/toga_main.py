@@ -9,6 +9,7 @@ from .parallel_jobs_manager import (
     CustomStrategy, NextflowStrategy, 
     ParaStrategy, ParallelJobsManager
 )
+from .results_checks import ResultChecker, SanityCheckResult
 from .shared import (
     CommandLineManager, dir_name_by_date, 
     get_upper_dir, hex_dir_name
@@ -602,6 +603,9 @@ class TogaMain(CommandLineManager):
         self.orth_resolution_report: str = os.path.join(
             self.output, 'orthology_classification.tsv'
         )
+        self.summary: str = os.path.join(
+            self.output, 'summary.txt'
+        )
         self.cds_gzip: str = self.cds_fasta + '.gz'
         self.codon_gzip: str = self.codon_fasta + '.gz'
         self.exon_gzip: str = self.exon_fasta + '.gz'
@@ -664,14 +668,11 @@ class TogaMain(CommandLineManager):
         self._to_log(
             'Working directory created', 'info'
         )
-        # self._echo('Working directory successfully created')
-        # self._echo('Writing project metadata')
         self._to_log('Writing project metadata', 'info')
         self.write_project_meta()
         self._to_log(
             f'Project metadata dumped at {self.arg_file}', 'info'
         )
-        # self._echo(f'Project metadata dumped at {self.arg_file}')
 
         ## check the input arguments
         # self._echo('Checking input arguments')
@@ -706,16 +707,24 @@ class TogaMain(CommandLineManager):
         # self.check_u12_file()
         # self.check_isoform_file_file()
 
+        ## create a sanity checker instance
+        self.result_checker: ResultChecker = ResultChecker(
+            self.logger,
+            self.output,
+            self.isoform_file,
+            self.orthology_threshold,
+            self.accepted_loss_symbols
+        )
+
         ## create the necessary links, indices, and HDF5 storage files
-        # self._echo('Preparing input data')
         if self._execute_step('setup'):
             self._to_log('Preparing input data', 'info')
             self.prepare_data()
             self._to_log('All input data successfully checked and handled', 'info')
 
-        ## Step 1: Extract chain features
-        # self._echo('Running TOGA main procedure')
+        ## showdowm
         self._to_log('Running TOGA main procedure', 'info')
+        ## Step 1: Extract chain features
         if self._execute_step('feature_extraction'):
             if not self.legacy_chain_feature_extraction:
                 self._to_log('Exracting projection features for further classification')
@@ -735,7 +744,6 @@ class TogaMain(CommandLineManager):
                 self.run_feature_extraction_jobs()
                 self._to_log('All projection feature jobs finished')
                 ## 1c: Aggregate chain feature data and create a classification dataset
-                # self._echo('Aggregating projection features')
                 self._to_log('Aggregating projection features')
                 self.create_feature_dataset()
                 self._to_log('Feature dataset successfully prepared')
@@ -746,22 +754,20 @@ class TogaMain(CommandLineManager):
             self._to_log('Skipping feature extraction step as suggested')
 
         ## Step 2: Classify chain-transcript pairs in terms of orthology
-        # self._echo('Classifying projections')
         if self._execute_step('classification'):
             self._to_log('Classifying projections', 'info')
             self.classify_chains()
-            # self._echo('Projections successfully classified')
             self._to_log('Projection successfully classified', 'info')
         else:
             if self.halt_at == 'classification':
                 self.notify_on_completion('classification')
                 self._exit('Finish pipeline before projection classification step as suggested')
             self._to_log('Skipping projection classification step as suggested')
+        self._sanity_check(self.result_checker.check_classification())
 
         if self._execute_step('preprocessing'):
             ## Step 2.5: Unless explicitly disabled, stitch fragmented projections
             if not self.disable_fragment_assembly:
-                # self._echo('Recovering fragmented projections')
                 self._to_log('Recovering fragmented projections', 'info')
                 self.recover_fragmented_projections()
                 # self._echo('Fragmented projections successfully recovered')
@@ -769,14 +775,12 @@ class TogaMain(CommandLineManager):
 
             ## Step 3: Prepare and run CESAR preprocessing jobs
             ## prepare preprocessing jobs
-            # self._echo('Scheduling preprocessing jobs')
             if self.selected_preprocessing_batches is None:
                 self._to_log('Scheduling preprocessing jobs', 'info')
                 self.schedule_preprocessing_jobs()
             else:
                 self._to_log('Preparing selected preprocessing batches for parallel run')
                 self._schedule_selected_batches('preprocessing')
-            # self._echo('Preprocessing jobs scheduled')
             self._to_log('Preprocessing jobs scheduled', 'info')
 
             ## run preprocessing jobs
@@ -798,24 +802,22 @@ class TogaMain(CommandLineManager):
                 self.notify_on_completion('aggregate_preprocessing_res')
                 self._exit('Finish aggregatting preprocessing results step as suggested')
             self._to_log('Skipping aggregatting preprocessing results step as suggested')
+        self._sanity_check(self.result_checker.check_preprocessing())
 
         ## Step 4: Prepare and run CESAR alignment & postprocessing jobs
         if self._execute_step('alignment'):
             ## prepare alignment jobs
-            # self._echo('Scheduling CESAR alignment jobs')
             if self.selected_alignment_batches is None:
                 self._to_log('Scheduling CESAR alignment jobs', 'info')
                 self.schedule_alignment_jobs()
             else:
                 self._to_log('Preparing selected alignment batches for parallel run')
                 self._schedule_selected_batches('alignment')
-            # self._echo('Alignment jobs scheduler')
             self._to_log('Alignment jobs scheduled', 'info')
 
             ## then run them
             self._to_log('Running alignment jobs (parallel step)', 'info')
             self.run_alignment_jobs()
-            # self._echo('Alignment step complete')
             self._to_log('Alignment step complete', 'info')
         else:
             if self.halt_at == 'alignment':
@@ -838,18 +840,17 @@ class TogaMain(CommandLineManager):
         ## and (if requested) gene levels
 
         ## 6a: Aggregate rejection reports from all the previous steps
-        # self._echo('Aggregating rejection reports')
         if self._execute_step('loss_summary'):
             self._to_log('Aggregating rejection reports', 'info')
             self.aggregate_rejection_reports()
-            # self._echo(f'All rejected items are placed into {self.final_rejection_log}')
             self._to_log(
-                'All rejected items are placed into %s' % self.final_rejection_log,
+                'Rejected items from all the finished steps are aggregated at %s' % (
+                    self.final_rejection_log
+                ),
                 'info'
             )
 
             ## 6b: Summarise loss data
-            # self._echo('Summarizing transcript/gene conservation data')
             self._to_log('Summarizing transcript/gene conservation data', 'info')
             self.loss_status_summary()
             # self._echo('Conservation data successfully summarized')
@@ -866,20 +867,17 @@ class TogaMain(CommandLineManager):
                 self.notify_on_completion('loss_summary')
                 self._exit('Finishing pipeline before gene loss summary step as suggested')
             self._to_log('Skipping gene loss summary step as suggested')
+        self._sanity_check(self.result_checker.check_loss_summary())
 
 
         ## Step 7: Resolve orthology status for all reference genes
         ## collapse projections to genes
-        # self._echo('Inferring query genes')
         if self._execute_step('orthology'):
             self._to_log('Inferring query genes', 'info')
             self.infer_query_genes()
-            # self._echo('Query genes successfully inferred')
             self._to_log('Query genes successfully inferred', 'info')
 
             ## resolve orthology relationships with a graph-based method
-            # self._echo('Resolving orthology relationships')
-            # self._echo('Running initial step (graph-based resolution)')
             if not self.skip_tree_resolver:
                 self._to_log('Converting protein annotation FASTA file into HDF5 format')
                 self.convert_fasta_to_hdf5()
@@ -887,12 +885,10 @@ class TogaMain(CommandLineManager):
             self._to_log('Resolving orthology relationships', 'info')
             self._to_log('Running initial step (graph-based resolution)', 'info')
             self.resolve_orthology_initial()
-            # self._echo('Graph-based step successfully finished')
             self._to_log('Graph-based step successfully finished', 'info')
             ## aggregate the results
 
             ## if requested, run fine orthology resolution jobs
-            # self.copy_resolution_reports()
             if not self.skip_tree_resolver:
                 self._to_log(
                     'Running fine orthology resolution jobs (parallel step)',
@@ -907,6 +903,8 @@ class TogaMain(CommandLineManager):
                 self.notify_on_completion('orthology')
                 self._exit('Finishing pipeline before orthology inference step as suggested')
             self._to_log('Skipping orthology inference step as suggested')
+        if self.skip_tree_resolver:
+            self._sanity_check(self.result_checker.check_orthology_resolution())
 
         ## Step 8: If tree-based resolution was requested, summarize its results 
         ## and adjust orthology resolution accordingly
@@ -927,6 +925,8 @@ class TogaMain(CommandLineManager):
                 self._to_log(
                     'Skipping adding gene tree data to orthology inference as suggested'
                 )
+        if not self.skip_tree_resolver:
+            self._sanity_check(self.result_checker.check_orthology_resolution())
 
         ## Step 9: Finalize the output
         if self._execute_step('finalize'):
@@ -966,7 +966,11 @@ class TogaMain(CommandLineManager):
                 self._exit('Finishing pipeline before UCSC report preparation as suggested')
             self._to_log('Skipping UCSC report preparation step as suggested')
 
-        ## Step 11: If requested, clean the temporary directory
+        ## Step 11: Final touch
+        ## Drop the summary
+        self.get_summary()
+
+        ## If requested, clean the temporary directory
         self._to_log('TOGA2 pipeline finished, cleaning up the temporary data')
         self.cleanup()
 
@@ -1006,8 +1010,10 @@ class TogaMain(CommandLineManager):
                 Constants.CRASH_EMAIL.format(self.project_name, self.output, msg))
         super()._die(msg)
 
-    def _abspath(self, path: str) -> str:
+    def _abspath(self, path: Union[str, None]) -> Union[str, None]:
         """Checks whether a path is absolute, prepends root prefix if not"""
+        if path is None:
+            return path
         if os.path.isabs(path):
             return path
         return os.path.abspath(path)
@@ -1320,6 +1326,31 @@ class TogaMain(CommandLineManager):
         subprocess.call(cmd, shell=True)
         # _ = self._exec(cmd, "E-mail notification via mailx failed: ")
 
+    def _sanity_check(self, result: SanityCheckResult) -> None:
+        """
+        Process the sanity check results; if contact e-mail is provided, 
+        further shoots a notification message
+        """
+        warning_msgs: List[str] = []
+        for res in result.messages:
+            if not res.is_warning:
+                self._to_log(res.log_message)
+                continue
+            self._to_log(res.log_message, 'warning')
+            warning_msgs.append(res.warning_message)
+        if not warning_msgs:
+            return
+        self._to_log(Constants.SANITY_CHECK_PS, 'warning')
+        if self.email is not None:
+            email_warning: str = '\n'.join(warning_msgs)
+            self._email(
+                Constants.WARNING_SUBJECT.format(self.project_name, result.step),
+                Constants.WARNING_EMAIL.format(
+                    self.project_name, self.output, 
+                    result.step, email_warning
+                )
+            )
+
     def create_wd(self) -> None:
         """Sets the output directory structure"""
         ## create the zero-level output directory
@@ -1532,7 +1563,6 @@ class TogaMain(CommandLineManager):
         twobit_out: str = self._exec(
             twobit_cmd, err_msg='', die=False
         )
-        print(f'{twobit_out=}')
         if 'is not a twoBit file' not in twobit_out:
             return
         compress_check_cmd: str = f'{Constants.SETUP} file {twobit_file} | grep -q "compressed"'
@@ -2443,7 +2473,17 @@ class TogaMain(CommandLineManager):
 
     def get_summary(self) -> None:
         """Prepares a summary file of all successfully completed steps"""
-        pass
+        summary: str = self.result_checker.summary(
+            self.ref_2bit, 
+            self.query_2bit, 
+            self.chain_file, 
+            self.ref_annotation,
+            self.output
+        )
+        self._to_log('TOGA2 run summary:\n%s\n' % summary)
+        self._to_log('The same summary can be found at %s' % self.summary)
+        with open(self.summary, 'w') as h:
+            h.write(summary)
 
     def notify_on_completion(self, step: str) -> None:
         """Generates and sends an e-mail notification on successful TOGA2 run"""

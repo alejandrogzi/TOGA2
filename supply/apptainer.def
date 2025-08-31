@@ -71,13 +71,14 @@ Stage: build
 %runscript
     ## by default the container is configured for SLURM; modify the passwd
     ## as suggested at https://info.gwdg.de/wiki/doku.php?id=wiki:hpc:usage_of_slurm_within_a_singularity_container
-    export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
     echo “slurmadmin:x:300:300::/opt/slurm/slurm:/bin/false” >> /etc/passwd
     echo “slurmadmin:x:300:” >> /etc/group
+    cd /opt/TOGA2
+    source toga2/bin/activate
+    export LD_LIBRARY_PATH=/usr/lib64:$LD_LIBRARY_PATH
     export SLURM_CONF=$SLURM_CONF
     export NXF_HOME=$TMPDIR/.nextflow
-    export PATH=$EXEC_DIR:$PATH
-    cd /opt/TOGA2
+    export PATH="$EXEC_DIR:$HOME/.cargo/bin:/opt/nextflow:/opt/conda/bin:/opt/TOGA2:/opt/TOGA2/bin:/opt/TOGA2/bin/prank:/opt/TOGA2/bin/iqtree2:/opt/TOGA2/bin/intronIC:$PATH"
     exec toga2.py "$@"
 
 %labels

@@ -309,7 +309,7 @@ def toga2() -> None:
     '-ot',
     type=float,
     metavar='FLOAT',
-    default=0.5,
+    default=Constants.DEFAULT_ORTH_THRESHOLD,
     show_default=True,
     help='Probability threshold for considering projections as orthologous'
 )
@@ -818,9 +818,9 @@ def toga2() -> None:
     show_default=True,
     help=(
         'A comma-separated list of loss status symbols; only projections of '
-        'respective statuses will be considered when creating a connection graph. '
-        'Keyword ALL lets all possible statuses in.'
-    )
+        'respective statuses will be considered for orthology resolution. '
+        'Supported symbols are: %s. Keyword ALL lets all possible statuses in.'
+    ) % ",".join(Constants.ALL_LOSS_SYMBOLS)
 )
 @orth_options.option(
     '--skip_gene_trees',
@@ -1704,7 +1704,7 @@ def spliceai(**kwargs) -> None:
 
     \b
     spliceai - Predict putative splice sites in the query assembly with SpliceAI
-    NOTE: This mode is currently under development.
+    NOTE: This mode is currently in test. The results might differ from those produced by the code used for TOGA2 companion dataset preparation. If you notice any substantial differences from the expected results, pleae contact TOGA2 developer team.
 
     TOGA2 uses SpliceAI predictions for the query genome to improve exon annotation and record 
     unique evolutionary events, such as distant splice site shifts and intron gains, in the query. 
@@ -1737,6 +1737,7 @@ def postoga() -> None:
     postoga - Invoke Postoga for in-depth analysis of TOGA2 results
     NOTE: This mode is currently under development.
     """
+
 
 @toga2.command(
     context_settings=CONTEXT_SETTINGS, 

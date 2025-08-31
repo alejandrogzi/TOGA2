@@ -32,6 +32,10 @@ CONTEXT_SETTINGS: Dict[str, Any] = {
 ## minimal Python version accepted; so far the lowest tested with T2 was 3.9
 MIN_MINOR_VERSION: int = 9
 
+## maximal Python version supporting certain pkg_resources functions;
+## if used Python minor version exceeds this value, certain third-party files must be modified inplace
+PKG_MAX_VERSION: int = 11
+
 ## requirement list file
 REQUIREMENTS: str = 'requirements.txt'
 
@@ -216,7 +220,7 @@ class SpliceAiChecker(ThirdPartyChecker):
 
 
 INSTALLABLES: List[ThirdPartyChecker] = [ 
-    IntronIcChecker(), SpliceAiChecker(),
+    IntronIcChecker(),
     PrankChecker(), IqTreeChecker(),
 ]
 
@@ -225,10 +229,41 @@ MISSING_PYTHON_PACKAGES: str = 'missing_packages.txt'
 MISSING_THIRD_PARTY: str = 'missing_third_party.txt'
 
 ## installation commands for third-party software
-## GLOBAL TO-DO: SpliceAi should be installed as a Python package
-## For the three remaining tools, commands should be turned into classes
-# INTRONIC_INSTALL_CMD: str = 'git clone https://github.com/glarue/intronIC.git bin/intronIC'
-##
+class Installer:
+    def install():
+        pass
+
+class IntronIcInstaller(Installer):
+    def install() -> None:
+        ## clone from github
+        dest: str = os.path.join(os.path.dirname(__file__), 'bin', 'intronIC')
+        clone_cmd: str = f'git clone https://github.com/glarue/intronIC {dest}'
+        subprocess.call(clone_cmd, shell=True)
+        minor_v: int = sys.version_info.minor
+        if minor_v > PKG_MAX_VERSION:
+            versioneer: str = os.path.join(dest, 'versioneer.py')
+            sed_cmd: str = f"sed -i 's/SafeConfig/Config/g; s/readfp/read_file/g' {versioneer}"
+            subprocess.call(sed_cmd, shell=True)
+
+class PrankInstaller(Installer):
+    def install():
+        install_cmd: str = """git clone https://github.com/ariloytynoja/prank-msa.git bin/prank && \
+    cd bin/prank/src && make && mv prank ../
+"""
+        subprocess.call(install_cmd, shell=True)
+
+class IqTree2Installer(Installer):
+    def install():
+        install_cmd: str = """\
+wget -P bin/ https://github.com/iqtree/iqtree2/releases/download/v2.4.0/iqtree-2.4.0-Linux-intel.tar.gz && \
+    tar -xzvf bin/iqtree-2.4.0-Linux-intel.tar.gz -C bin/ && \
+    mv bin/iqtree-2.4.0-Linux-intel/bin/iqtree2 bin/ && \
+    rm -rf bin/iqtree-2.4.0-Linux-intel bin/iqtree-2.4.0-Linux-intel.tar.gz
+"""
+        subprocess.call(install_cmd)
+
+INSTALLERS: Tuple[Installer] = (IntronIcInstaller, PrankInstaller, IqTree2Installer)
+
 INTRONIC_INSTALL_CMD: str = """
 wget -P bin https://github.com/glarue/intronIC/archive/refs/tags/v1.5.2.tar.gz && \
 tar -xzvf bin/v1.5.2.tar.gz -C bin/ && rm -rf bin/v1.5.2.tar.gz && mv bin/intronIC-1.5.2 bin/intronIC
@@ -246,7 +281,6 @@ wget -P bin/ https://github.com/iqtree/iqtree2/releases/download/v2.4.0/iqtree-2
 """
 INSTALL_CMDS: Dict[str, str] = {
     'intronIC': INTRONIC_INSTALL_CMD,
-    'spliceai': SPLICEAI_INSTALL_CMD,
     'prank': PRANK_INSTALL_CMD,
     'iqtree2': IQTREE2_INSTALL_CMD
 }
@@ -381,8 +415,11 @@ def check_python(installation_mode: Optional[bool]) -> None:
     minor_v: int = sys.version_info.minor
     if minor_v < MIN_MINOR_VERSION:
         click.echo(
-            'ERROR: Used Python version is 3.%i'
+            (
+                'ERROR: Used Python version is 3.%i; recommended minimal version is 3.%i'
+            ) % (minor_v, MIN_MINOR_VERSION)
         )
+        sys.exit(1)
 
     packages_to_install: Dict[str, str] = {}
     for pack_name, (package, version_) in PACKAGES.items():
@@ -519,6 +556,8 @@ def install_third_party() -> None:
             cmd: str = INSTALL_CMDS[line]
             subprocess.run(cmd, shell=True)
             click.echo('Successfully installed %s' % line)
+    for installer in INSTALLERS:
+        installer.install()
 
 if __name__ == '__main__':
     check_deps()

@@ -1,4 +1,5 @@
 use clap::Parser;
+use fxhash::FxHashMap;
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -18,6 +19,10 @@ struct Args {
     #[arg(long, short = 'o')]
     output: String
 }
+
+// static MUT2SHAPE: FxHashMap<&str, String> = FxHashMap::from_iter([
+//     ("", String::from("")),
+// ]);
 
 fn main() {
     let args = Args::parse();

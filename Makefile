@@ -10,11 +10,11 @@ VENV_NAME ?= toga2
 
 all: build
 
-check: check_shell check_essentials check_python check_managers check_third_party
+check: check_shell check_essentials check_managers check_third_party
 
 build: chmod check install build_c build_cesar build_cython build_rust train_models
 
-install: install_binaries install_python_packages install_third_party
+install: install_binaries install_python install_third_party
 
 build_c:
 	if [ ARCH = "arm64" ]; then \
@@ -99,12 +99,16 @@ install_python_packages:
 	fi ; \
 	echo ${DELIM}
 
+install_python:
+	python3 -m venv toga2 && \
+	source toga2/bin/activate && \
+	python3 -m pip install -r requirements.txt
+
 install_third_party:
-	if [[ ${VENV} == true ]]; then \
-		source ${VENV_NAME}/bin/activate ; \
-	fi; \
+	source toga2/bin/activate
 	./${CHECK_DEPS} install_third_party
 
 train_models:
+	source toga2/bin/activate
 	src/python/train_model.py
 	echo ${DELIM}

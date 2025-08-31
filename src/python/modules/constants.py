@@ -148,8 +148,9 @@ class Constants:
             'resolved_leaves_file', 'orth_resolution_report', 'one2zero_genes'
         ),
         'finalize': (
-            'query_annotation_final', 'query_annotation_with_utrs', 'processed_pseudogene_annotation',
-            'finalized_output_dir', 'query_genes', 'query_genes_bed',
+            'query_annotation_final', 'query_annotation_with_utrs', 
+            'processed_pseudogene_annotation', 'finalized_output_dir', 
+            'query_genes', 'query_genes_bed', 'summary'
             # 'cds_gzip', 'codon_gzip', 'exon_gzip', 'prot_gzip',
             # 'splice_sites_gzip', 'exon_meta_gzip', 'transcript_meta_gzip'
         ),
@@ -189,6 +190,7 @@ class Constants:
     ITER_DURATION: int = 60  # CESAR jobs check interval
     UTF8: str = 'utf-8'
 
+    ## Nextflow configuration constants
     NEXTFLOW_SUPPORTED_EXECS: Tuple[str] = (
         'awsbatch', 'azurebatch', 'bridge', 'flux',
         'google-batch', 'condor', 'hq', 'k8s',
@@ -201,7 +203,6 @@ class Constants:
         'orthology': 'orthology.nf' 
     }
     ALN_CONFIG: str = 'alignment_{}.nf'
-
     NEXTFLOW_STUB: str = """#!/usr/bin/env nextflow
 
 nextflow.enable.dsl=2
@@ -237,7 +238,6 @@ workflow {{
     NUM_CESAR_MEM_PRECOMP_JOBS = 500
     PARA_STRATEGIES = ("nextflow", "para", "custom")  # TODO: add snakemake
 
-    TEMP_CHAIN_CLASS = "temp_chain_trans_class"
     MODULES_DIR = "modules"
     RUNNING = "RUNNING"
     CRASHED = "CRASHED"
@@ -254,11 +254,9 @@ workflow {{
     PP_FEATURES: List[str] = ['clipped_exon_qlen', 'clipped_intr_cover']
     PP_CLIPPED_EXON_QLEN: float = 0.3
     PP_CLIPPED_INTRON_QLEN: float = 0.1
-
-    # from CESAR_wrapper.py #
-    FRAGMENT_CHAIN_ID = -1
-    ORTH_LOC_LINE_SUFFIX = "#ORTHLOC"
-    UNDEF_REGION = "None:0-0"
+    DEFAULT_ORTH_THRESHOLD: float = 0.5
+    SPANNING_CHAIN_PROB: float = -1.0
+    PPGENE_PROB: float = -2.0
 
     # Sequence related #
     ATG_CODON = "ATG"
@@ -275,6 +273,7 @@ workflow {{
 
     DEFAULT_UCSC_PREFIX: str = 'HLTOGAannot'
 
+    ## E-mail notification
     MAILX_TEMPLATE: str = 'echo -e "{}" | {} -s "{}" {}'
     SUCCESS_EMAIL_HEADER: str = '{} - Success'
     SUCCESS_EMAIL: str = (
@@ -287,8 +286,20 @@ workflow {{
 
     CRASH_HEADER: str = '{} - Crashed!'
     CRASH_EMAIL: str = """
-    This is an automated notification on TOGA2 project {} hosted at directory {} having crashed with the following error:\n{}
-    """
+This is an automated notification on TOGA2 project {} hosted at directory {} \
+having crashed with the following error:\n{}
+"""
+    SANITY_CHECK_PS: str = """
+If the current run's setup has known complications \
+(low quality input assemblies, large evolutionary distance between references and query species, \
+specific gene/genome architecture in any of the species, etc.), disregard this e-mail. \
+Otherwise, you might want to halt the current run and inspect the results and/or input files.
+"""
+    WARNING_SUBJECT: str = "{} - Sanity check warning at {} step"
+    WARNING_EMAIL: str = """
+This is an automated notification on TOGA2 project {} hosted at directory {} \
+reporting the following warning at the {} step:\n{}
+""" + SANITY_CHECK_PS
 
 
 class ConstColors:
@@ -362,7 +373,7 @@ class Headers:
         (
             'transcript', 'chain', 'max_mem', 'sum_mem', 
             'largest_target', 'largest_query', 
-            'chrom', 'locus_start', 'locus_end', 
+            'chrom', '%covered_exons', 'locus_start', 'locus_end', 
             'init_start', 'init_end', 'chain_start', 'chain_end',
             'batch_path'
         )
@@ -600,7 +611,8 @@ TOGA2_SLOTS: Tuple[str] = (
     'toga1', 'toga1_plus_cesar',
 
     'tmp', 'logs', 'meta', 'ucsc_dir', 
-    'nextflow_dir', 'arg_file', 'log_file', 'failed_batches_file',
+    'nextflow_dir', 'arg_file', 'log_file', 
+    'failed_batches_file', 'result_checker',
 
     'project_name', 'local_executor', 'logger', 
     'cluster_queue_name', 'parallel_process_names', 'ignore_crashed_parallel_batches',
@@ -638,7 +650,7 @@ TOGA2_SLOTS: Tuple[str] = (
     'cds_gzip', 'codon_gzip', 'exon_gzip', 'prot_gzip',
     'splice_sites_gzip', 'exon_meta_gzip', 'transcript_meta_gzip',
     'query_annotation_final', 'query_annotation_with_utrs',
-    'processed_pseudogene_annotation',
+    'processed_pseudogene_annotation', 'summary',
 
     'feature_job_dir', 'feature_data_dir', 'feature_res_dir',
     'preprocessing_job_dir', 'preprocessing_res_dir',

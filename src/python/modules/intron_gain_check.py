@@ -3,20 +3,25 @@ Uses CESAR2 alignment results and SpliceAI predictions
 to search for additional introns in the query data
 """
 
-from .cesar_wrapper_constants import *
+from .cesar_wrapper_constants import (
+    GAP_CODON, MIN_INTRON_LENGTH, STOPS
+)
 from .cesar_wrapper_executables import CesarInput, RawCesarOutput, fast_seq_id
 from copy import deepcopy
 from dataclasses import dataclass
 from logging import Logger
 # from Operator import mul
 from shared import parts
-from typing import Any, Dict, List, Optional, Tuple, TypeVar, Union
+from typing import (
+    Any, Dict, Iterable, 
+    List, Optional, Tuple, 
+    TypeVar, Union
+)
 
 __author__ = 'Yury V. Malovichko'
 __year__ = '2024'
 __credits__ = ('Michael Hiller')
 
-ExCand = TypeVar('ExCand', bound='ExonCandidate')
 PotExGroup = TypeVar('PotExGroup', bound='PotentialExonGroup')
 
 class Coords:
@@ -364,7 +369,7 @@ class IntronGainChecker:
             rel_exon_start, rel_exon_stop = None, None
             for j, base in enumerate(aln_portion.reference):
                 # j: int = k + prev_aln_len
-                query_base: str = aln_portion.query[j]
+                # query_base: str = aln_portion.query[j]
                 if is_symbol(base):
                     if not exon_start_encountered:
                         # continue
