@@ -152,7 +152,7 @@ PREPROCESSING_WARNING: str = (
 )
 LOSS_STUB: str = """\
 Of {total} orthologous {lvl} having reached the gene loss summary step, \
-{num_valid} {lvl} ({fraction}%) do not belong to loss classes \
+{num_valid} {lvl} ({fraction}%) belong to loss classes \
 designating gene presence ({classes})\
 """
 LOSS_OK: str = 'Sanity check passed: ' + LOSS_STUB
