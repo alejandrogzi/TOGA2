@@ -758,9 +758,9 @@ class TogaMain(CommandLineManager):
 
         ## Step 2: Classify chain-transcript pairs in terms of orthology
         if self._execute_step('classification'):
-            self._to_log('Classifying projections', 'info')
+            self._to_log('Classifying projections')
             self.classify_chains()
-            self._to_log('Projection successfully classified', 'info')
+            self._to_log('Projection successfully classified')
         else:
             if self.halt_at == 'classification':
                 self.notify_on_completion('classification')
@@ -771,10 +771,10 @@ class TogaMain(CommandLineManager):
         if self._execute_step('preprocessing'):
             ## Step 2.5: Unless explicitly disabled, stitch fragmented projections
             if not self.disable_fragment_assembly:
-                self._to_log('Recovering fragmented projections', 'info')
+                self._to_log('Recovering fragmented projections')
                 self.recover_fragmented_projections()
                 # self._echo('Fragmented projections successfully recovered')
-                self._to_log('Fragmented projections successfully recovered', 'info')
+                self._to_log('Fragmented projections successfully recovered')
 
             ## Step 3: Prepare and run CESAR preprocessing jobs
             ## prepare preprocessing jobs
@@ -787,9 +787,9 @@ class TogaMain(CommandLineManager):
             self._to_log('Preprocessing jobs scheduled', 'info')
 
             ## run preprocessing jobs
-            self._to_log('Running preprocessing jobs (parallel step)', 'info')
+            self._to_log('Running preprocessing jobs (parallel step)')
             self.run_preprocessing_jobs()
-            self._to_log('Preprocessing jobs finished', 'info')
+            self._to_log('Preprocessing jobs finished')
         else:
             if self.halt_at == 'preprocessing':
                 self.notify_on_completion('preprocessing')
@@ -811,7 +811,7 @@ class TogaMain(CommandLineManager):
         if self._execute_step('alignment'):
             ## prepare alignment jobs
             if self.selected_alignment_batches is None:
-                self._to_log('Scheduling CESAR alignment jobs', 'info')
+                self._to_log('Scheduling CESAR alignment jobs')
                 self.schedule_alignment_jobs()
             else:
                 self._to_log('Preparing selected alignment batches for parallel run')
@@ -819,9 +819,9 @@ class TogaMain(CommandLineManager):
             self._to_log('Alignment jobs scheduled', 'info')
 
             ## then run them
-            self._to_log('Running alignment jobs (parallel step)', 'info')
+            self._to_log('Running alignment jobs (parallel step)')
             self.run_alignment_jobs()
-            self._to_log('Alignment step complete', 'info')
+            self._to_log('Alignment step complete')
         else:
             if self.halt_at == 'alignment':
                 self.notify_on_completion('alignment')
@@ -830,9 +830,9 @@ class TogaMain(CommandLineManager):
 
         ## Step 5: Aggregate alignment/postprocessing results
         if self._execute_step('aggregate_cesar_res'):
-            self._to_log('Aggregating alignment results', 'info')
+            self._to_log('Aggregating alignment results')
             self.aggregate_cesar_results()
-            self._to_log('CESAR step results successfully aggregated', 'info')
+            self._to_log('CESAR step results successfully aggregated')
         else:
             if self.halt_at == 'aggregate_cesar_res':
                 self.notify_on_completion('aggregate_cesar_res')
@@ -844,7 +844,7 @@ class TogaMain(CommandLineManager):
 
         ## 6a: Aggregate rejection reports from all the previous steps
         if self._execute_step('loss_summary'):
-            self._to_log('Aggregating rejection reports', 'info')
+            self._to_log('Aggregating rejection reports')
             self.aggregate_rejection_reports()
             self._to_log(
                 'Rejected items from all the finished steps are aggregated at %s' % (
@@ -854,10 +854,10 @@ class TogaMain(CommandLineManager):
             )
 
             ## 6b: Summarise loss data
-            self._to_log('Summarizing transcript/gene conservation data', 'info')
+            self._to_log('Summarizing transcript/gene conservation data')
             self.loss_status_summary()
             # self._echo('Conservation data successfully summarized')
-            self._to_log('Conservation data successfully summarized', 'info')
+            self._to_log('Conservation data successfully summarized')
 
             ## 6c: If processed pseudogenes were not considered in the previous steps,
             ## prepare a simple BED9 track
@@ -876,30 +876,29 @@ class TogaMain(CommandLineManager):
         ## Step 7: Resolve orthology status for all reference genes
         ## collapse projections to genes
         if self._execute_step('orthology'):
-            self._to_log('Inferring query genes', 'info')
+            self._to_log('Inferring query genes')
             self.infer_query_genes()
-            self._to_log('Query genes successfully inferred', 'info')
+            self._to_log('Query genes successfully inferred')
 
             ## resolve orthology relationships with a graph-based method
             if not self.skip_tree_resolver:
                 self._to_log('Converting protein annotation FASTA file into HDF5 format')
                 self.convert_fasta_to_hdf5()
                 self._to_log('HDF5 preparation is complete')
-            self._to_log('Resolving orthology relationships', 'info')
-            self._to_log('Running initial step (graph-based resolution)', 'info')
+            self._to_log('Resolving orthology relationships')
+            self._to_log('Running initial step (graph-based resolution)')
             self.resolve_orthology_initial()
-            self._to_log('Graph-based step successfully finished', 'info')
+            self._to_log('Graph-based step successfully finished')
             ## aggregate the results
 
             ## if requested, run fine orthology resolution jobs
             if not self.skip_tree_resolver:
                 self._to_log(
                     'Running fine orthology resolution jobs (parallel step)',
-                    'info'
                 )
                 self.run_tree_jobs()
                 self._to_log('Tree jobs finished', 'info')
-                self._to_log('Updating orthology estimates with tree-inferred data', 'info')
+                self._to_log('Updating orthology estimates with tree-inferred data')
             self._to_log('Orthology inference step complete', 'info')
         else:
             if self.halt_at == 'orthology':
@@ -1771,7 +1770,7 @@ class TogaMain(CommandLineManager):
         
         ## if any of the models are missing by chance, train the classifier first
         if not os.path.isfile(self.se_model) or not os.path.isfile(self.me_model):
-            self._exec(self.MODEL_TRAINER)
+            self._exec(self.MODEL_TRAINER, 'Model training failed')
 
         ## classify chains
         ## TODO: Transcripts discarded at this step are considered as missing in TOGA 1.0

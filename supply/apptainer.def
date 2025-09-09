@@ -35,7 +35,7 @@ Stage: build
     # exim -bP
 
     ## install cargo
-    curl https://sh.rustup.rs -sSf | sh
+    curl https://sh.rustup.rs -sSf | sh -s -- -y
     . "$HOME/.cargo/env" 
 
     ## install Nextflow
