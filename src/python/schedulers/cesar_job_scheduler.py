@@ -5,7 +5,6 @@ A module for CESAR job binning based on maximal memory requirements
 """
 
 from collections import defaultdict, namedtuple
-from dataclasses import dataclass
 from heapq import heappop, heappush
 from math import ceil
 from modules.constants import PRE_CLEANUP_LINE
@@ -15,7 +14,8 @@ from modules.cesar_wrapper_constants import (
     FIRST_ACCEPTOR, LAST_DONOR
 )
 from modules.shared import (
-    CommandLineManager, get_upper_dir, intersection, CONTEXT_SETTINGS, SPLIT_JOB_HEADER
+    CommandLineManager, get_upper_dir, 
+    intersection, CONTEXT_SETTINGS, SPLIT_JOB_HEADER
 )
 from pathlib import Path
 from shared import get_connected_components
@@ -39,7 +39,7 @@ TOGA2_ROOT: str = get_upper_dir(__file__, 4)
 
 ## define constants
 # LOCATION: str = os.path.dirname(os.path.abspath(__file__))
-BLOSUM_FILE: str = os.path.join(LOCATION, *DEF_BLOSUM_FILE)
+BLOSUM_FILE: str = os.path.join(TOGA2_ROOT, *DEF_BLOSUM_FILE)
 HL_CESAR_PATH: str = os.path.join(
     os.path.sep,
     'projects',
@@ -974,7 +974,7 @@ class CesarScheduler(CommandLineManager):
                 0: [(0, i) for i in range(self.jobnum)]
             }
             self.job2mem = {k: 0 for k in range(self.jobnum)}
-        balanced_jobs: Dict[int, List[str]] = defaultdict(list)
+        # balanced_jobs: Dict[int, List[str]] = defaultdict(list)
 
         ## Step 3: For each cap, split projections into jobs in the LPT fashion
         for bin in memory_buckets:

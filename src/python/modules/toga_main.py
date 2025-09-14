@@ -2233,6 +2233,8 @@ class TogaMain(CommandLineManager):
         Updates the orthology resolution results, aggregating the batchwise
         results in the respective meta/ subdirectory
         """
+        num_res_files: int = 0
+        num_unres_files: int = 0
         for batch in os.listdir(self.orthology_res_dir):
             ok_file: str = os.path.join(self.orthology_res_dir, batch, Constants.OK_FILE)
             if not os.path.exists(ok_file):
@@ -2241,30 +2243,33 @@ class TogaMain(CommandLineManager):
                     'warning'
                 )
                 self.failed_orthology_batches.append(batch)
+                continue
+            resolved_leaves_file: str = os.path.join(self.orthology_res_dir, batch, 'resolved_pairs.tsv')
+            if os.path.exists(resolved_leaves_file):
+                num_res_files += 1
+            unresolved_leaves_file: str = os.path.join(self.orthology_res_dir, batch, 'unresolved_clades.txt')
+            if os.path.exists(unresolved_leaves_file):
+                num_unres_files += 1
         if self.failed_orthology_batches and not self.ignore_crashed_parallel_batches:
             self._write_failed_batches_and_exit('orthology')
         self._create_output_stub('resolved_leaves_file')
-        leaf_aggr_cmd: str = (
-            f'{Constants.SETUP} cat {self.orthology_res_dir}/*/resolved_pairs.tsv | cut -f1,2 >> '
-            f'{self.resolved_leaves_file}'
-        )
-        _ = self._exec(
-            leaf_aggr_cmd, 'ERROR: Resolved clades\' data aggregation failed'
-        )
-        unresolved_aggr_cmd: str = (
-            f'cat {self.orthology_res_dir}/*/unresolved_clades.txt > '
-            f'{self.unresolved_clades_file}'
-        )
-        _ = self._exec(
-            unresolved_aggr_cmd, 'ERROR: Unresolved clades\' data aggregation failed'
-        )
-        # ## TODO: Import the class instead!
-        # cmd: str = (
-        #     f'{self.FINAL_RESOLVER_SCRIPT} {self.temporary_orth_report} '
-        #     f'{self.resolved_leaves_file} -o {self.orth_resolution_raw} '
-        #     f'-o2z {self.one2zero_genes} '
-        # )
-        # _ = self._exec(cmd, 'ERROR: Final orthology resolution failed')
+        if num_res_files:
+            leaf_aggr_cmd: str = (
+                f'{Constants.SETUP} cat {self.orthology_res_dir}/*/resolved_pairs.tsv | cut -f1,2 >> '
+                f'{self.resolved_leaves_file}'
+            )
+            _ = self._exec(
+                leaf_aggr_cmd, 'ERROR: Resolved clades\' data aggregation failed'
+            )
+        if num_unres_files:
+            unresolved_aggr_cmd: str = (
+                f'cat {self.orthology_res_dir}/*/unresolved_clades.txt > '
+                f'{self.unresolved_clades_file}'
+            )
+            _ = self._exec(
+                unresolved_aggr_cmd, 'ERROR: Unresolved clades\' data aggregation failed'
+            )
+        ## update the orthology resolution file
         from .final_orthology_aggregator import FinalOrthologyResolver
         args: List[str] = [
             self.temporary_orth_report, self.resolved_leaves_file,

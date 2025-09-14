@@ -461,6 +461,7 @@ class PreprocessingScheduler(CommandLineManager):
                             f' --max_space_size {self.max_space_size}'
                             f' --extrapolation_modifier {self.extrapolation_modifier}'
                             f' --exon_locus_flank {self.exon_locus_flank}'
+                            f' --bigwig2wig_binary {self.bigwig2wig_binary}'
                         )
                         if self.toga1 and not self.toga1_plus_cesar:
                             cmd += ' -t1 '
