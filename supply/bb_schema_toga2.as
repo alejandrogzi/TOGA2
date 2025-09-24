@@ -31,11 +31,11 @@ table togaBigBed
     float perc_intact_int_M;  "% intact considering missing as intact"
     float intact_codon_prop;  "% intact codons"
 
-    float ouf_prop;  "% out of chain" ## NOT NEEDED ANYMORE
+    float ouf_prop;  "% out of chain"
     string mid_intact;  "Is middle 80% intact"
     string mid_pres;  "Is middle 80% fully present"
     lstring prot_alignment; "HTML-formatted protein alignment"
-    lstring svg_line;  "SVG inactivating mutations visualization" ## MIGHT CONTAIN MULTIPLE LINES IF TRANSCRIPT IS FRAGMENTED
+    lstring svg_line;  "SVG inactivating mutations visualization"
 
     lstring ref_link;  "Reference transcript link"
     lstring inact_mut_html_table;  "HTML-formatted inactivating mutations table"

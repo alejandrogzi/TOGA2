@@ -32,6 +32,8 @@ __credits__ = ('Bogdan M. Kirilenko', 'Michael Hiller')
 
 LOCATION: str = get_upper_dir(__file__, 4)
 PYTHON_DIR: str = get_upper_dir(__file__, 2)
+BIN: str = os.path.join(LOCATION, 'bin')
+
 sys.path.append(PYTHON_DIR)
 
 class TogaMain(CommandLineManager):
@@ -107,7 +109,6 @@ class TogaMain(CommandLineManager):
         cesar_first_acceptor: Optional[click.Path],
         cesar_last_donor: Optional[click.Path],
         separate_splice_site_treatment: Optional[bool],
-        bigwig2wig_binary: Optional[click.Path],
         spliceai_correction_mode: Optional[int],
         min_splice_prob: Optional[float],
         splice_prob_margin: Optional[float],
@@ -135,7 +136,6 @@ class TogaMain(CommandLineManager):
         fixed_adjacent_utr_extra: Optional[bool],
         link_file: Optional[Union[click.Path, None]],
         ucsc_prefix: Optional[str],
-        bedtobigbed_binary: Optional[Union[click.Path, None]],
         parallel_strategy: Optional[str],
         nextflow_exec_script: Optional[Union[click.Path, None]],
         max_number_of_retries: Optional[int],
@@ -149,16 +149,21 @@ class TogaMain(CommandLineManager):
         toga1_plus_corrected_cesar: Optional[bool],
         account_for_alternative_frame: Optional[bool],
         output: Optional[click.Path],
+        project_name: Optional[str],
         keep_temporary_files: Optional[bool],
         verbose: Optional[bool],
         email: Optional[Union[str, None]],
         mailx_binary: Optional[Union[str, None]],
         fatotwobit_binary: Optional[Union[click.Path, None]],
-        twobittofa_binary: Optional[Union[click.Path, None]]
+        twobittofa_binary: Optional[Union[click.Path, None]],
+        bigwig2wig_binary: Optional[click.Path],
+        bedtobigbed_binary: Optional[Union[click.Path, None]],
+        ixixx_binary: Optional[Union[click.Path, None]]
         # version: Optional[bool],
     ) -> None:
         self.v: bool = verbose
-        self.project_name: str = hex_dir_name('TOGA2')
+        self.project_name: str = project_name
+        self.project_id: str = hex_dir_name()
 
         ## internalized attributes
         self.ref_2bit: click.Path = self._abspath(ref_2bit)
@@ -221,7 +226,6 @@ class TogaMain(CommandLineManager):
         self.cesar_last_donor: click.Path = self._abspath(cesar_last_donor)
         self.separate_site_treat: bool = separate_splice_site_treatment
 
-        self.bigwig2wig_binary: click.Path = bigwig2wig_binary
         self.min_splice_prob: float = min_splice_prob
         self.splice_prob_margin: float = splice_prob_margin
         self.intron_gain_check: bool = intron_gain_check
@@ -263,9 +267,11 @@ class TogaMain(CommandLineManager):
         self.email: Union[str, None] = email
         self.mailx_binary: Union[click.Path, None] = mailx_binary
 
-        self.bedtobigbed_binary: Union[click.Path, None] = bedtobigbed_binary
         self.fatotwobit_binary: Union[click.Path, None] = fatotwobit_binary
         self.twobittofa_binary: Union[click.Path, None] = twobittofa_binary
+        self.bigwig2wig_binary: click.Path = bigwig2wig_binary
+        self.bedtobigbed_binary: Union[click.Path, None] = bedtobigbed_binary
+        self.ixixx_binary: Union[click.Path, None] = ixixx_binary
 
         self.parallel_strategy: str = parallel_strategy
         self.max_number_of_retries: int = max_number_of_retries
@@ -315,9 +321,9 @@ class TogaMain(CommandLineManager):
         self.ucsc_dir: str = os.path.join(
             self.output, 'ucsc_browser_files'
         )
-        self.arg_file: str = os.path.join(self.logs, f'project_args_{self.project_name}.tsv')
-        self.log_file: str = os.path.join(self.logs, f'{self.project_name}.log')
-        self.failed_batches_file: str = os.path.join(self.logs, f'failed_batches_{self.project_name}.tsv')
+        self.arg_file: str = os.path.join(self.logs, f'project_args_{self.project_id}.tsv')
+        self.log_file: str = os.path.join(self.logs, f'{self.project_id}.log')
+        self.failed_batches_file: str = os.path.join(self.logs, f'failed_batches_{self.project_id}.tsv')
 
         ## temporary subdirectories
         self.input_data: str = os.path.join(self.tmp, 'input_data')
@@ -414,6 +420,15 @@ class TogaMain(CommandLineManager):
         )
         self.annot_dir: str = os.path.join(
             self.tmp, 'annotation_raw'
+        )
+        self.all_discarded_projections: str = os.path.join(
+            self.annot_dir, 'all_discarded_projections.txt'
+        )
+        self.cds_fasta_tmp: str = os.path.join(
+            self.annot_dir, 'nucleotide.fa'
+        )
+        self.prot_fasta_tmp: str = os.path.join(
+            self.annot_dir, 'proteins.fa'
         )
         self.orth_resolution_raw: str = os.path.join(
             self.annot_dir, 'orthology_classification.tsv'
@@ -521,9 +536,13 @@ class TogaMain(CommandLineManager):
         self.aggr_ucsc_stub: str = os.path.join(
             self.vis_input_dir, 'ucsc_bed_stub.bed23'
         )
+        self.decor_stub: str = os.path.join(
+            self.vis_input_dir, 'decorator.bb'
+        )
         self.all_deprecated_projs: str = os.path.join(
             self.vis_input_dir, 'all_deprecated_projections.txt'
         )
+        
 
         ## output files and directories
         self.transcript_meta: str = os.path.join(
@@ -594,6 +613,9 @@ class TogaMain(CommandLineManager):
         self.pseudogene_annotation: str = os.path.join(
             self.output, 'processed_pseudogenes.bed'
         )
+        self.prot_fasta: str = os.path.join(
+            self.output, 'proteins.fa'
+        )
         self.query_genes: str = os.path.join(
             self.output, 'query_genes.tsv'
         )
@@ -609,10 +631,11 @@ class TogaMain(CommandLineManager):
         self.decoration_track: str = os.path.join(
             self.ucsc_dir, f'{self.ucsc_prefix}.decorator.bb'
         )
+        self.aa_gzip: str = self.aa_fasta + '.gz'
         self.cds_gzip: str = self.cds_fasta + '.gz'
         self.codon_gzip: str = self.codon_fasta + '.gz'
         self.exon_gzip: str = self.exon_fasta + '.gz'
-        self.prot_gzip: str = self.aa_fasta + '.gz'
+        self.prot_gzip: str = self.prot_fasta + '.gz'
         self.splice_sites_gzip: str = self.splice_sites + 'gz'
         self.exon_meta_gzip: str = self.query_exon_meta + '.gz'
         self.transcript_meta_gzip: str = self.transcript_meta + '.gz'
@@ -650,6 +673,9 @@ class TogaMain(CommandLineManager):
         self.FINAL_RESOLVER_SCRIPT: str = os.path.join(
             LOCATION, 'modules', 'final_orthology_aggregator.py'
         )
+        self.FASTA_FILTER_SCRIPT: str = os.path.join(
+            LOCATION, 'src', 'rust', 'target', 'release', 'filter_fasta'
+        )
         self.UTR_PROJECTOR_SCRIPT: str = os.path.join(
             LOCATION, 'src', 'rust', 'target', 'release', 'utr_projector'  
         )
@@ -658,6 +684,9 @@ class TogaMain(CommandLineManager):
         )
         self.SCHEMA_FILE: str = os.path.join(
             LOCATION, 'supply', 'bb_schema_toga2.as'
+        )
+        self.DECOR_SCHEMA_FILE: str = os.path.join(
+            LOCATION, 'supply', 'decoration.as'
         )
 
         self.run()
@@ -945,7 +974,7 @@ class TogaMain(CommandLineManager):
             self._to_log('Creating exon 2bit file for SLEASY')
             self.convert_exon_fasta()
             self._to_log('Compressing FASTA files from the output')
-            self.gzip_fasta_files()
+            self.gzip_heavy_files()
             self._to_log('Finalizing naming notation for query genes')
             self.rename_query_genes()
             ## before moving to the final steps, record the failed batches 
@@ -986,7 +1015,7 @@ class TogaMain(CommandLineManager):
         """
         Sets up logging system for a TogaMain instance
         """
-        self.logger: logging.Logger = logging.getLogger(self.project_name)
+        self.logger: logging.Logger = logging.getLogger(self.project_id)
         file_handler: logging.FileHandler = logging.FileHandler(
             self.log_file, mode='a', encoding=Constants.UTF8
         )
@@ -1008,8 +1037,8 @@ class TogaMain(CommandLineManager):
         """Error-exit with a given message"""
         if self.email is not None:
             self._email(
-                Constants.CRASH_HEADER.format(self.project_name), 
-                Constants.CRASH_EMAIL.format(self.project_name, self.output, msg))
+                Constants.CRASH_HEADER.format(self.project_id), 
+                Constants.CRASH_EMAIL.format(self.project_id, self.output, msg))
         super()._die(msg)
 
     def _abspath(self, path: Union[str, None]) -> Union[str, None]:
@@ -1247,14 +1276,14 @@ class TogaMain(CommandLineManager):
                 self._rm(out_path)
                 jobfiles_to_execute[0].append(job_file)
         if step == 'alignment':
-            new_summary_file: str = f'{self.cesar_job_list_summary}_partial_{self.project_name}'
+            new_summary_file: str = f'{self.cesar_job_list_summary}_partial_{self.project_id}'
             self.cesar_job_list_summary = new_summary_file
             context = open(self.cesar_job_list_summary, 'w')
         else: 
             context = nullcontext()
         with context as c:
             for i, joblist in joblists.items():
-                new_joblist_name: str = f'{joblist}_partial_{self.project_name}'
+                new_joblist_name: str = f'{joblist}_partial_{self.project_id}'
                 jobs: List[str] = jobfiles_to_execute[i]
                 if not jobs:
                     continue
@@ -1346,9 +1375,9 @@ class TogaMain(CommandLineManager):
         if self.email is not None:
             email_warning: str = '\n'.join(warning_msgs)
             self._email(
-                Constants.WARNING_SUBJECT.format(self.project_name, result.step),
+                Constants.WARNING_SUBJECT.format(self.project_id, result.step),
                 Constants.WARNING_EMAIL.format(
-                    self.project_name, self.output, 
+                    self.project_id, self.output, 
                     result.step, email_warning
                 )
             )
@@ -1462,7 +1491,15 @@ class TogaMain(CommandLineManager):
         ## check bigWigToWig binary
         for attr, default_name in Constants.BINARIES_TO_CHECK.items():
             if self.__getattribute__(attr) is None:
-                self._to_log('Looking for %s in $PATH' % default_name)
+                expected_path: str = os.path.join(BIN, default_name)
+                if os.path.exists(expected_path) and os.access(expected_path, os.X_OK):
+                    self._to_log('Found %s at bin/%s' % (default_name, default_name))
+                    continue
+                self._to_log(
+                    '%s in inaccessible at bin/; looking for %s in $PATH' % (
+                        default_name, default_name
+                    )
+                )
                 exe_in_path: Union[str, None] = which(default_name)
                 if exe_in_path is None:
                     if default_name == 'mailx':
@@ -1650,7 +1687,7 @@ class TogaMain(CommandLineManager):
         args: List[str] = [
             self.ref_annotation, self.bed_file_copy, 
             self.prefiltered_transcripts,
-            '-ln', self.project_name
+            '-ln', self.project_id
         ]
         ## TODO: Add the contig filter flags
         self._to_log('Filtering reference BED file')
@@ -1683,7 +1720,7 @@ class TogaMain(CommandLineManager):
         ## TODO: Rust implementation?
         args: List[str] = [
             self.cds_bed_hdf5, self.u12_file, self.u12_hdf5, '--hdf5_input', 
-            '-ln', self.project_name
+            '-ln', self.project_id
         ]
         IntronIcConverter(args, standalone_mode=False)
         self._to_log('U12 data formatting complete')
@@ -1713,7 +1750,7 @@ class TogaMain(CommandLineManager):
             self.chain_file_copy, self.bed_file_copy, 
             self.feature_job_dir, self.feature_data_dir, self.feature_res_dir, 
             '-j', f'{self.feature_job_num}',
-            '-r', self.feature_rejection_log, '-ln', self.project_name
+            '-r', self.feature_rejection_log, '-ln', self.project_id
         ]
         ChainFeatureScheduler(args, standalone_mode=False)
 
@@ -1724,7 +1761,7 @@ class TogaMain(CommandLineManager):
         single-core implementation in Rust. Do not use it unless you experience problems 
         with the Rust code.
         """
-        project_name: str = f'chain_feats_{self.project_name}'
+        project_name: str = f'chain_feats_{self.project_id}'
         self.parallel_process_names.append(project_name)
         project_path: str = os.path.join(self.nextflow_dir, project_name)
         self._run_parallel_process(
@@ -1757,7 +1794,7 @@ class TogaMain(CommandLineManager):
             self._write_failed_batches_and_exit('feature extraction')
         args: List[str] = [
             self.feature_res_dir, self.bed_file_copy, self.feature_table,
-            '-ln', self.project_name
+            '-ln', self.project_id
         ]
         if self.isoform_file is not None:
             args.extend(('--isoforms', self.isoform_file))
@@ -1777,7 +1814,7 @@ class TogaMain(CommandLineManager):
         from classify_chains import ChainClassifier
         args: List[str] = [
             self.feature_table, self.classification_dir, self.se_model, self.me_model,
-            '-t', f'{self.orthology_threshold}', '-ln', self.project_name,
+            '-t', f'{self.orthology_threshold}', '-ln', self.project_id,
             '-minscore', self.min_orth_chain_score
         ]
         if self.use_ld_model:
@@ -1865,7 +1902,7 @@ class TogaMain(CommandLineManager):
             'paralog_report': self.paralog_report,
             'processed_pseudogene_report': self.processed_pseudogene_report,
             'rejection_report': self.preprocessing_rejection_log,
-            'log_name': self.project_name,
+            'log_name': self.project_id,
             'verbose': True
         }
         if self.toga1 and not self.toga1_plus_cesar:
@@ -1898,7 +1935,7 @@ class TogaMain(CommandLineManager):
         """
         Runs CESAR preprocessing jobs
         """
-        project_name: str = f'cesar_preprocess_{self.project_name}'
+        project_name: str = f'cesar_preprocess_{self.project_id}'
         self.parallel_process_names.append(project_name)
         project_path: str = os.path.join(self.nextflow_dir, project_name)
         self._run_parallel_process(
@@ -2015,7 +2052,7 @@ class TogaMain(CommandLineManager):
                         )
                         continue
                     job_num: int = int(self.job_nums_per_bin[self.cesar_memory_bins.index(mem)])
-                    project_name: str = f'cesar_align_{self.project_name}_{mem}'
+                    project_name: str = f'cesar_align_{self.project_id}_{mem}'
                     self.parallel_process_names.append(project_name)
                     project_path: str = os.path.join(self.nextflow_dir, project_name)
                     manager: ParallelJobsManager = self._run_parallel_process(
@@ -2105,7 +2142,7 @@ class TogaMain(CommandLineManager):
         args: List[str] = [
             self.tr2chain_classes, self.chain_file_copy, 
             '-o', self.pseudogene_annotation, 
-            '-ln', self.project_name, '-v'
+            '-ln', self.project_id, '-v'
         ]
         PseudogeneTrackBuilder(args, standalone_mode=False)
 
@@ -2117,7 +2154,7 @@ class TogaMain(CommandLineManager):
         args: List[str] = [
             #self.query_annotation_filt, 
             self.query_exon_meta, self.query_genes_raw, 
-            '-b', self.query_genes_bed_raw, '-ln', self.project_name,
+            '-b', self.query_genes_bed_raw, '-ln', self.project_id,
             '-l', self.gene_loss_summary, 
             '-d', self.redundant_paralogs, '-dpp', self.redundant_ppgenes,
             '-pf', self.feature_table, '-op', self.pred_scores,
@@ -2151,7 +2188,7 @@ class TogaMain(CommandLineManager):
         out_file: str = self.aa_hdf5
         from pairwise_fasta_to_hdf5 import FastaToHdf5Converter
         args: List[str] = [
-            in_file, out_file, '-ln', self.project_name, '-v'
+            in_file, out_file, '-ln', self.project_id, '-v'
         ]
         FastaToHdf5Converter(args, standalone_mode=False)
 
@@ -2168,7 +2205,7 @@ class TogaMain(CommandLineManager):
             self.bed_file_copy, self.query_annotation_filt, self.gene_loss_summary,
             self.pred_scores, self.orthology_resolution_dir,
             '-qi', self.query_genes_raw, '-l', self.accepted_loss_symbols,
-            '-mr', self.preprocessing_report, '-ln', self.project_name,
+            '-mr', self.preprocessing_report, '-ln', self.project_id,
             # '-pf', self.feature_table
         ]
         if self.isoform_file is not None:
@@ -2216,7 +2253,7 @@ class TogaMain(CommandLineManager):
         """
         if self.skip_tree_resolver:
             return
-        project_name: str = f'tree_resolution_{self.project_name}'
+        project_name: str = f'tree_resolution_{self.project_id}'
         self.parallel_process_names.append(project_name)
         project_path: str = os.path.join(self.nextflow_dir, project_name)
         self._run_parallel_process(
@@ -2286,7 +2323,7 @@ class TogaMain(CommandLineManager):
         from gene_tree_summary import GeneTreeSummary
         args: List[str] = [
             self.orthology_input_dir, self.orthology_res_dir, 
-            self.tree_summary_table, '-ln', self.project_name, '-v'
+            self.tree_summary_table, '-ln', self.project_id, '-v'
         ]
         if self.use_raxml:
             args.append('--raxml')
@@ -2319,7 +2356,7 @@ class TogaMain(CommandLineManager):
         args: List[str] = [
             self.aggr_ucsc_stub, self.bed_file_copy, self.feature_table,
             self.pred_scores, self.query_contig_size_file, self.SCHEMA_FILE,
-            self.vis_input_dir, '-ln', self.project_name, '--prefix', self.ucsc_prefix
+            self.vis_input_dir, '-ln', self.project_id, '--prefix', self.ucsc_prefix
         ]
         if self.ref_link_file:
             args.extend(['-i', self.ref_link_file])
@@ -2339,11 +2376,21 @@ class TogaMain(CommandLineManager):
             self.query_annotation_final
         )
         self._to_log('Preparing decoration BigBed file')
+        # decor_cmd: str = (
+        #     f'{self.DECORATOR_SCRIPT} -b {decor_bed_input} -m {self.mutation_report} '
+        #     f'-c {self.query_contig_size_file} -o {self.decoration_track}'
+        # )
         decor_cmd: str = (
             f'{self.DECORATOR_SCRIPT} -b {decor_bed_input} -m {self.mutation_report} '
-            f'-c {self.query_contig_size_file} -o {self.decoration_track}'
+            f'-c {self.query_contig_size_file} -o {self.decor_stub} && '
+            f'sort -o {self.decor_stub} -k1,1 -k2,2n {self.decor_stub}'
         )
         _ = self._exec(decor_cmd, 'Decoration track production failed:')
+        decor_bb_cmd: str = (
+            f'{self.bedtobigbed_binary} -type=bed12+ -as={self.DECOR_SCHEMA_FILE} '
+            f'{self.decor_stub} {self.query_contig_size_file} {self.decoration_track}'
+        )
+        _ = self._exec(decor_bb_cmd, 'Decoration track conversion to BigBed format failed:')
 
         for file in Constants.FINAL_UCSC_FILES:
             file = file.format(self.ucsc_prefix)
@@ -2351,7 +2398,43 @@ class TogaMain(CommandLineManager):
             to_path: str = os.path.join(self.ucsc_dir, file)
             copy(from_path, to_path)
 
-    def gzip_fasta_files(self) -> None:
+    def produce_final_sequence_files(self) -> None:
+        """
+        Filters nucleotide and amino acid sequence files, leaving only 
+        those corresponding to orthologs in the final annotation version
+        """
+        ## 1. Stack all the files with discarded items
+        discarded_files: List[str] = []
+        for attr in Constants.DISCARDED_PROJECTION_FILES:
+            file: str = getattr(self, attr)
+            if os.path.exists(file):
+                discarded_files.append(file)
+        if discarded_files:
+            all_files: str = ' '.join(discarded_files)
+            aggr_cmd: str = f'cat {all_files} > {self.all_discarded_projections}'
+            _ = self._exec(aggr_cmd, 'Discarded projection lists\' aggregation failed:')
+        ## 2. Filter the nucleotide file
+        nuc_cmd: str = (
+            f'{self.FASTA_FILTER_SCRIPT} -i {self.cds_fasta_tmp} '
+            f'-o {self.cds_fasta}'
+        )
+        if discarded_files:
+            nuc_cmd += f' -d {self.all_discarded_projections}'
+        _ = self._exec(
+            nuc_cmd, 'Final nucleotide sequence file preparation failed:'
+        )
+        ## 3. Filter the protein sequence file
+        prot_cmd: str = (
+            f'{self.FASTA_FILTER_SCRIPT} -i {self.aa_fasta} '
+            f'-o {self.prot_fasta}'
+        )
+        if discarded_files:
+            prot_cmd += f' -d {self.all_discarded_projections}'
+        _ = self._exec(
+            prot_cmd, 'Final protein sequence file preparation failed:'
+        )
+
+    def gzip_heavy_files(self) -> None:
         """Compresses hefty output files into gzip format"""
         ## TODO: Modify ._exec() to support check_call()
         import subprocess
@@ -2409,7 +2492,7 @@ class TogaMain(CommandLineManager):
         args: List[str] = [
             self.exon_fasta, self.exon_2bit, 
             '--fa2twobit', self.fatotwobit_binary,
-            '-ln', self.project_name,
+            '-ln', self.project_id,
             '-e', self.query_exon_meta,
             '--tmp_dir', self.tmp
         ]
@@ -2440,7 +2523,7 @@ class TogaMain(CommandLineManager):
         from .finalise_orthology_files import QueryGeneNamer
         args: List[str] = [
             self.orth_resolution_raw, self.query_genes_raw, self.finalized_output_dir,
-            '-qb', self.query_genes_bed_raw, '-ln', self.project_name
+            '-qb', self.query_genes_bed_raw, '-ln', self.project_id
         ]
         QueryGeneNamer(args, standalone_mode=False)
         for file in os.listdir(self.finalized_output_dir):
@@ -2507,8 +2590,8 @@ class TogaMain(CommandLineManager):
 
     def notify_on_completion(self, step: str) -> None:
         """Generates and sends an e-mail notification on successful TOGA2 run"""
-        body: str = Constants.SUCCESS_EMAIL.format(self.project_name, self.output)
+        body: str = Constants.SUCCESS_EMAIL.format(self.project_id, self.output)
         if step != 'all':
             body += Constants.PARTIAL_RUN_NOTE.format(step)
-        subject: str = Constants.SUCCESS_EMAIL_HEADER.format(self.project_name)
+        subject: str = Constants.SUCCESS_EMAIL_HEADER.format(self.project_id)
         self._email(subject, body)

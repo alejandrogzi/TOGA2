@@ -26,7 +26,7 @@ import logging
 import os
 
 __author__ = 'Yury V. Malovichko'
-__version__ = '2.0.3'
+__version__ = '2.0.4'
 __year__ = '2024'
 __credits__ = ('Bogdan M. Kirilenko', 'Michael Hiller')
 
@@ -970,17 +970,6 @@ def toga2() -> None:
     show_default=True,
     help='A prefix to use in the output file names'
 )
-@browser_options.option(
-    '--bedtobigbed_binary',
-    type=click.Path(exists=True),
-    metavar='BEDTOBIGBED_PATH',
-    default=None,
-    show_default=True,
-    help=(
-        'A path to UCSC bedToBigBed executable; if not set, the executable with this name '
-        'will be sought for in PATH'
-    )
-)
 @parallel_options.option(
     '--parallel_strategy',
     '-c',
@@ -1168,28 +1157,13 @@ def toga2() -> None:
         'A path to mailx executable; if not set, the executable with this name will be sought for in $PATH'
     )
 )
-## TODO: Path to bedToBigBed and ixIxx also go here
-@binary_options.option(
-    '--bigwig2wig_binary',
-    '-bw2w',
-    type=click.Path(exists=True),
-    metavar='BIGWIG2WIG_BINARY',
-    default=os.path.join(BIN, 'bigWigToWig'),
-    help=(
-        'A path to the UCSC bigWigToWig binary; if none is provided, '
-        'the utility will be sought for in $PATH under its default name'
-    )
-)
 @binary_options.option(
     '--fatotwobit_binary',
     type=click.Path(exists=True),
     metavar='FATOTWOBIT_PATH',
     default=os.path.join(BIN, 'faToTwoBit'),
     show_default=True,
-    help=(
-        'A path to UCSC faToTwoBit executable; if not set, the executable with this name '
-        'will be sought for in $PATH'
-    )
+    help='A path to UCSC faToTwoBit executable'
 )
 @binary_options.option(
     '--twobittofa_binary',
@@ -1197,10 +1171,31 @@ def toga2() -> None:
     metavar='TWOBITTOFA_PATH',
     default=os.path.join(BIN, 'twoBitToFa'),
     show_default=True,
-    help=(
-        'A path to UCSC twoBitToFa executable; if not set, the executable with this name '
-        'will be sought for in $PATH'
-    )
+    help='A path to UCSC twoBitToFa executable'
+)
+@binary_options.option(
+    '--bigwig2wig_binary',
+    '-bw2w',
+    type=click.Path(exists=True),
+    metavar='BIGWIG2WIG_BINARY',
+    default=os.path.join(BIN, 'bigWigToWig'),
+    help='A path to the UCSC bigWigToWig binary'
+)
+@binary_options.option(
+    '--bedtobigbed_binary',
+    type=click.Path(exists=True),
+    metavar='BEDTOBIGBED_PATH',
+    default=None,
+    show_default=True,
+    help='A path to UCSC bedToBigBed executable'
+)
+@binary_options.option(
+    '--ixixx_binary',
+    type=click.Path(exists=True),
+    metavar='IXIXX_PATH',
+    default=None,
+    show_default=True,
+    help='A path to UCSC ixIxx executable'
 )
 
 def run(**kwargs) -> None:
@@ -1675,6 +1670,19 @@ def prepare_input(**kwargs) -> None:
     default=None,
     show_default=True,
     help='A path to save the results to [default: spliceai_<date_time>]'
+)
+@out_options.option(
+    '--project_name',
+    '-name',
+    type=str,
+    metavar='PROJECT_NAME',
+    default='TOGA2',
+    show_default=True,
+    help=(
+        'A name for the current TOGA2 project. This name will be used '
+        'as a prefix followed by run start date and time to name current runs\' '
+        'log and metadata files'
+    )
 )
 @out_options.option(
     '--keep_temporary_files',

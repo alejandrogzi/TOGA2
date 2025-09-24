@@ -38,7 +38,7 @@ const MUT2SHAPE: phf::Map<&'static str, &'static str> = phf_map!{
     "FS_INS" => "InvTriangle",
     "STOP" => "Star",
     "SSMA" => "Square",
-    "SSMD" => "SSMD"
+    "SSMD" => "Square"
 };
 const BLOCK_MUTS: (&str, &str) = ("BIG_DEL", "BIG_INS");
 
@@ -119,7 +119,7 @@ fn main() {
             let start: u64 = match mut_comps[5].parse::<u64>() {
                 Ok(s) => {s},
                 Err(_) => {
-                    println!("Improper mutation file formatting at line {}: \"start\" field is not a valid integer", i+1);
+                    eprintln!("Improper mutation file formatting at line {}: \"start\" field is not a valid integer", i+1);
                     continue
                 }
             };
@@ -131,7 +131,7 @@ fn main() {
             let end: u64 = match mut_comps[6].parse::<u64>() {
                 Ok(e) => {e},
                 Err(_) => {
-                    println!("Improper mutation file formatting at line {}: \"end\" field is not a valied integer", i+1);
+                    eprintln!("Improper mutation file formatting at line {}: \"end\" field is not a valied integer", i+1);
                     continue
                 }
             };
@@ -251,7 +251,7 @@ fn main() {
                     let mut last_coord: u64 = first_coord + 1;
                     if last_coord >= chrom_size {
                         last_coord = chrom_size - 1;
-                        if first_coord == last_coord {first_coord -= 1}
+                        if first_coord >= last_coord {first_coord = last_coord - 1}
                     }
                     let shape = MUT2SHAPE.get(&mutation.mut_type).unwrap();
                     let mut_name: String = format!(

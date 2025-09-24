@@ -2,9 +2,26 @@ use anyhow::{Context, Result};
 use chaintools::cmap::chain::Chain;
 use cubiculum::merge::merge::intersection;
 use cubiculum::structs::structs::{Coordinates, Interval, Named};
+use flate2::read::MultiGzDecoder;
 use std::cmp::{max, min, Ord};
 use std::fmt::Debug;
+use std::fs::File;
+use std::io::{BufRead, BufReader};
+use std::path::Path;
 
+/// Main reading function; reads either a plain text file or a gzipped file line-by-line
+pub fn read<T>(file: T) -> Box<dyn BufRead> 
+    where 
+    T: AsRef<Path>
+{
+if file.as_ref().extension().unwrap() == "gz" {
+    let path = File::open(file).unwrap();
+    return Box::new(BufReader::new(MultiGzDecoder::new(path))) as Box<dyn BufRead>
+} else {
+    let path = File::open(file).unwrap();
+    return Box::new(BufReader::new(path)) as Box<dyn BufRead>
+}
+}
 
 /// An auxiliary function for obtaining coding sequence boundaries in both reference and query
 /// 

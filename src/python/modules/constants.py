@@ -18,6 +18,7 @@ class Constants:
         'bigwig2wig_binary': 'bigWigToWig',
         'fatotwobit_binary': 'faToTwoBit',
         'twobittofa_binary': 'twoBitToFa',
+        'ixixx_binary': 'ixIxx',
         'mailx_binary': 'mailx'
     }
 
@@ -57,7 +58,7 @@ class Constants:
     ]
     CESAR_FILE_TO_DEST: Dict[str, str] = {
         CESAR_REJECTION_LOG: 'alignment_rejection_log',
-        CDS_FASTA: 'cds_fasta',
+        CDS_FASTA: 'cds_fasta_tmp',
         CODON_ALN: 'codon_fasta',
         EXON_ALN: 'exon_fasta',
         EXON_META: 'query_exon_meta',
@@ -127,7 +128,8 @@ class Constants:
             'transcript_meta', 'query_exon_meta', 
             'splice_sites', 'mutation_report',
             'aa_fasta', 'cds_fasta', 'codon_fasta', 
-            'exon_fasta', 'exon_2bit',
+            'exon_fasta', 'exon_2bit', 'prot_fasta',
+            'cds_fasta_tmp', 'prot_fasta_tmp',
             'codon_gzip', 'exon_gzip', 'prot_gzip', 'cds_gzip',
             'splice_sites_gzip', 'exon_meta_gzip', 'transcript_meta_gzip',
             'alignment_rejection_log', 'gained_intron_summary', 
@@ -150,7 +152,8 @@ class Constants:
         'finalize': (
             'query_annotation_final', 'query_annotation_with_utrs', 
             'processed_pseudogene_annotation', 'finalized_output_dir', 
-            'query_genes', 'query_genes_bed', 'summary'
+            'query_genes', 'query_genes_bed', 'summary',
+            'all_discarded_projections'
             # 'cds_gzip', 'codon_gzip', 'exon_gzip', 'prot_gzip',
             # 'splice_sites_gzip', 'exon_meta_gzip', 'transcript_meta_gzip'
         ),
@@ -175,9 +178,16 @@ class Constants:
         'spanning_chain_coords': 'SPANNING_CHAIN_HEADER'
     }
 
+    DISCARDED_PROJECTION_FILES: Tuple[str] = (
+        'paralogous_projections_to_align.tsv', 
+        'processed_pseudogene_projections_to_align.tsv', 
+        'discarded_overextended_projections'
+    )
+
     FILES_TO_GZIP: Tuple[str] = (
         'aa_fasta', 'cds_fasta', 'codon_fasta', 'exon_fasta',
-        'transcript_meta', 'query_exon_meta', 'splice_sites'
+        'prot_fasta', 'query_exon_meta', 'splice_sites',
+        'transcript_meta'
     )
 
 
@@ -579,7 +589,9 @@ TOGA2_SLOTS: Tuple[str] = (
     'preprocessing_job_num', 'max_chains_per_transcript', 'cesar_memory_limit',
     'max_search_space_size', 'extrapolation_modifier', 'minimal_covered_fraction',
     'exon_locus_flank', 'assembly_gap_size', 
-    'bigwig2wig_binary','bedtobigbed_binary', 'fatotwobit_binary', 'twobittofa_binary',
+    'bigwig2wig_binary','bedtobigbed_binary', 
+    'fatotwobit_binary', 'twobittofa_binary',
+    'ixixx_binary',
     'min_splice_prob', 'splice_prob_margin',
     'intron_gain_check', 'max_intron_number', 'min_intron_gain_score', 
     'min_intron_prob_gapped', 'min_intron_prob_ungapped',
@@ -608,7 +620,7 @@ TOGA2_SLOTS: Tuple[str] = (
     'max_number_of_retries', 'nextflow_config_dir',
     'max_parallel_time', 
     'keep_nextflow_log',
-    'output', 'keep_tmp', 
+    'output', 'project_name', 'keep_tmp', 
     'v', 'email', 'mailx_binary',
 
     'toga1', 'toga1_plus_cesar',
@@ -643,14 +655,14 @@ TOGA2_SLOTS: Tuple[str] = (
     'final_rejection_log', 'gene_loss_summary',
     'query_exon_meta', 'tree_summary_table',
     'aa_fasta', 'cds_fasta', 'codon_fasta', 
-    'exon_fasta', 'exon_2bit',
+    'exon_fasta', 'prot_fasta', 'exon_2bit',
     'query_genes_raw', 'query_genes_bed_raw', 
     'query_genes', 'query_genes_bed',
     'one2zero_genes', 'orth_resolution_report',
     'mutation_report', 'splice_sites', 
     'gained_intron_summary', 'splice_site_shifts', 'selenocysteine_codons',
     'pseudogene_annotation', 'aa_hdf5',
-    'cds_gzip', 'codon_gzip', 'exon_gzip', 'prot_gzip',
+    'aa_gzip', 'cds_gzip', 'codon_gzip', 'exon_gzip', 'prot_gzip',
     'splice_sites_gzip', 'exon_meta_gzip', 'transcript_meta_gzip',
     'query_annotation_final', 'query_annotation_with_utrs',
     'processed_pseudogene_annotation', 'summary', 'decoration_track',
@@ -661,8 +673,8 @@ TOGA2_SLOTS: Tuple[str] = (
     'orthology_job_dir', 'orthology_input_dir', 'orthology_res_dir',
     'orthology_results_dir',
     'rejection_dir', 'classification_dir', 'vis_input_dir', 'finalized_output_dir', 
-    'aggr_ucsc_stub', 'all_deprecated_projs',
-    'annot_dir',
+    'aggr_ucsc_stub', 'decor_stub', 'all_deprecated_projs',
+    'annot_dir', 'cds_fasta_tmp', 'prot_fasta_tmp', 'all_discarded_projections',
 
     'feature_extraction_joblist', 'cesar_preprocess_joblist', 'cesar_align_joblist',
     'orth_resolution_joblist',
@@ -676,9 +688,9 @@ TOGA2_SLOTS: Tuple[str] = (
     'REF_BED_FILTER', 'CDS_TRACK_SCRIPT', 'REF_BED_TO_HDF5', 'U12_TO_HDF5_SCRIPT',
     'CONTIG_SIZE_SCRIPT', 
     'FEATURE_EXTRACTOR',
-    'MODEL_TRAINER', 'FINAL_RESOLVER_SCRIPT',
+    'MODEL_TRAINER', 'FINAL_RESOLVER_SCRIPT', 'FASTA_FILTER_SCRIPT',
     'UTR_PROJECTOR_SCRIPT', 'DECORATOR_SCRIPT', 
-    'SCHEMA_FILE'
+    'SCHEMA_FILE', 'DECOR_SCHEMA_FILE'
 )
 
 TOGA2_SLOT2ARG: Dict[str, str] = {
@@ -772,12 +784,14 @@ TOGA2_SLOT2ARG: Dict[str, str] = {
     'toga1': 'toga1_compatible',
     'toga1_plus_cesar': 'toga1_plus_corrected_cesar',
     'output': 'output',
+    'project_name': 'project_name',
     'keep_tmp': 'keep_temporary_files',
     'v': 'verbose',
     'email': 'email',
     'mailx_binary': 'mailx_binary',
     'fatotwobit_binary': 'fatotwobit_binary',
     'twobittofa_binary': 'twobittofa_binary',
+    'ixixx_binary': 'ixixx_binary',
     'ucsc_prefix': 'ucsc_prefix',
     'bedtobigbed_binary': 'bedtobigbed_binary',
     'ignore_crashed_parallel_batches': 'ignore_crashed_parallel_batches'
