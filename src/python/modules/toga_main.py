@@ -2384,9 +2384,13 @@ class TogaMain(CommandLineManager):
         #     f'{self.DECORATOR_SCRIPT} -b {decor_bed_input} -m {self.mutation_report} '
         #     f'-c {self.query_contig_size_file} -o {self.decoration_track}'
         # )
+        exon_meta: str = (
+            self.exon_meta_gzip if os.path.exists(self.exon_meta_gzip) else self.query_exon_meta
+        )
         decor_cmd: str = (
             f'{self.DECORATOR_SCRIPT} -b {decor_bed_input} -m {self.mutation_report} '
-            f'-c {self.query_contig_size_file} -o {self.decor_stub} && '
+            f'-c {self.query_contig_size_file} -e {exon_meta}'
+            f'-o {self.decor_stub} && '
             f'sort -o {self.decor_stub} -k1,1 -k2,2n {self.decor_stub}'
         )
         _ = self._exec(decor_cmd, 'Decoration track production failed:')
@@ -2418,8 +2422,12 @@ class TogaMain(CommandLineManager):
             aggr_cmd: str = f'cat {all_files} > {self.all_discarded_projections}'
             _ = self._exec(aggr_cmd, 'Discarded projection lists\' aggregation failed:')
         ## 2. Filter the nucleotide file
+        # nuc_cmd: str = (
+        #     f'{self.FASTA_FILTER_SCRIPT} -i {self.cds_fasta_tmp} '
+        #     f'-o {self.cds_fasta}'
+        # )
         nuc_cmd: str = (
-            f'{self.FASTA_FILTER_SCRIPT} -i {self.cds_fasta_tmp} '
+            f'{self.FASTA_FILTER_SCRIPT} -b {self.query_annotation_final} '
             f'-o {self.cds_fasta}'
         )
         if discarded_files:
@@ -2428,8 +2436,12 @@ class TogaMain(CommandLineManager):
             nuc_cmd, 'Final nucleotide sequence file preparation failed:'
         )
         ## 3. Filter the protein sequence file
+        # prot_cmd: str = (
+        #     f'{self.FASTA_FILTER_SCRIPT} -i {self.aa_fasta} '
+        #     f'-o {self.prot_fasta}'
+        # )
         prot_cmd: str = (
-            f'{self.FASTA_FILTER_SCRIPT} -i {self.aa_fasta} '
+            f'{self.FASTA_FILTER_SCRIPT} -b {self.query_annotation_final} '
             f'-o {self.prot_fasta}'
         )
         if discarded_files:
