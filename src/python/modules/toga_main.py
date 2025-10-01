@@ -2389,7 +2389,7 @@ class TogaMain(CommandLineManager):
         )
         decor_cmd: str = (
             f'{self.DECORATOR_SCRIPT} -b {decor_bed_input} -m {self.mutation_report} '
-            f'-c {self.query_contig_size_file} -e {exon_meta}'
+            f'-c {self.query_contig_size_file} -e {exon_meta} '
             f'-o {self.decor_stub} && '
             f'sort -o {self.decor_stub} -k1,1 -k2,2n {self.decor_stub}'
         )
