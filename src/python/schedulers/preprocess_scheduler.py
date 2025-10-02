@@ -69,7 +69,8 @@ class PreprocessingScheduler(CommandLineManager):
         'ref', 'query', 'chain_file', 'ref_chrom_sizes', 'query_chrom_sizes',
         'joblist_file', 'segments',
         'fragmented_projections', 'jobnum', 'projections_per_command',
-        'max_chain_number', 'orthologs_only', 'one2one_only', 'parallel_execution',
+        'max_chain_number', 'orthologs_only', 'one2one_only', 
+        'parallel_execution', 'twobittofa_binary',
         'disable_spanning_chains', 'no_inference', 'memory_limit',
         'max_space_size', 'extrapolation_modifier', 'minimal_covered_fraction',
         'exon_locus_flank',
@@ -127,6 +128,7 @@ class PreprocessingScheduler(CommandLineManager):
         separate_splice_site_treatment: Optional[bool] = False,
         assembly_gap_size: Optional[int] = MIN_ASMBL_GAP_SIZE,
         u12: Optional[Union[click.Path, None]] = None,
+        twobittofa_binary: Optional[Union[click.Path, None]] = None,
         spliceai_dir: Optional[Union[click.Path, None]] = None,
         bigwig2wig_binary: Optional[Union[click.Path, None]] = None,
         min_splice_prob: Optional[bool] = 0.5,
@@ -187,6 +189,17 @@ class PreprocessingScheduler(CommandLineManager):
         self.assembly_gap_size: int = assembly_gap_size
         self.u12: Union[click.Path, None] = u12
         self.spliceai_dir: Union[click.Path, None] = spliceai_dir
+
+        if twobittofa_binary is None:
+            self._to_log('twoBitToFa binary was not set; looking for the binary in $PATH')
+            tb2f_in_path: str = which('twoBitToFa')
+            if tb2f_in_path is not None:
+                self.twobittofa_binary: click.Path = Path(tb2f_in_path).absolute()
+            else:
+                self._die('Binary twoBitToFa not found in $PATH, with no defaults')
+        else:
+            self.twobittofa_binary: click.Path = twobittofa_binary
+
         if bigwig2wig_binary is None:
             self._to_log('bigWigToWig binary was not set; looking for the binary in $PATH')
             bw2w_in_path: str = which('bigWigToWig')
@@ -459,6 +472,7 @@ class PreprocessingScheduler(CommandLineManager):
                             f' --max_space_size {self.max_space_size}'
                             f' --extrapolation_modifier {self.extrapolation_modifier}'
                             f' --exon_locus_flank {self.exon_locus_flank}'
+                            f' --twobittofa_binary {self.twobittofa_binary}'
                             f' --bigwig2wig_binary {self.bigwig2wig_binary}'
                         )
                         if self.toga1 and not self.toga1_plus_cesar:
@@ -487,7 +501,6 @@ class PreprocessingScheduler(CommandLineManager):
                                 cmd += f' --processed_pseudogene_list {ppgene_str}'
                         if self.spliceai_dir is not None:
                             cmd += f' --spliceai_dir {self.spliceai_dir}'
-                            cmd += f' --bigwig2wig_binary {self.bigwig2wig_binary}'
                             cmd += f' --min_splice_prob {self.min_splice_prob}'
                         cmd += f' --output {prepr_output}'# -v'
                         h2.write(cmd + '\n')
@@ -861,6 +874,17 @@ class PreprocessingScheduler(CommandLineManager):
     help=(
         'A three-column tab-separated file containing information on the '
         'non-canonical splice sites'
+    )
+)
+@click.option(
+    '--twobittofa_binary',
+    '-2b2f',
+    type=click.Path(exists=True),
+    metavar='TWOBITTOFA_BINARY',
+    default=None,
+    help=(
+        'A path to the UCSC twoBitToFa binary; '
+        'if not provided, will be sought for in $PATH'
     )
 )
 @click.option(
