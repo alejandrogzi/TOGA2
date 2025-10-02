@@ -216,10 +216,10 @@ MISSING: str = 'M'
     help='Flank size to extend the estimated exon loci by'
 )
 @click.option(
-    '--twobittofa_binary',
+    '--twobit2fa_binary',
     '-2b2f',
     type=click.Path(exists=True),
-    metavar='TWOBITTOFA_BINARY',
+    metavar='TWOBIT2FA_BINARY',
     default=None,
     help=(
         'A path to the UCSC twoBitToFa binary'
@@ -425,7 +425,7 @@ class CesarPreprocessor(CommandLineManager):
         'disable_spanning_chains', 'ppgene_list',
         'p_job', 'no_inference', 'memory_limit',
         'max_space_size', 'extrapolation_modifier', 'min_cov_portion',
-        'exon_locus_flank', 'twobittofa_binary',
+        'exon_locus_flank', 'twobit2fa_binary',
         'canon_u2_acceptor', 'canon_u2_donor',
         'non_canon_u2_acceptor', 'non_canon_u2_donor',
         'canon_u12_acceptor', 'canon_u12_donor',
@@ -469,7 +469,7 @@ class CesarPreprocessor(CommandLineManager):
         extrapolation_modifier: Optional[float],
         minimal_covered_fraction: Optional[float],
         exon_locus_flank: Optional[int],
-        twobittofa_binary: Optional[Union[click.Path, None]],
+        twobit2fa_binary: Optional[Union[click.Path, None]],
         cesar_canon_u2_acceptor: Optional[str],
         cesar_canon_u2_donor: Optional[str],
         cesar_non_canon_u2_acceptor: Optional[str],
@@ -564,7 +564,7 @@ class CesarPreprocessor(CommandLineManager):
         self.extrapolation_modifier: float = extrapolation_modifier
         self.min_cov_portion: float = minimal_covered_fraction
         self.exon_locus_flank: int = exon_locus_flank
-        self.twobittofa_binary: Union[str, None] = twobittofa_binary
+        self.twobit2fa_binary: Union[str, None] = twobit2fa_binary
         self.canon_u2_acceptor: str = cesar_canon_u2_acceptor
         self.canon_u2_donor: str = cesar_canon_u2_donor
         self.non_canon_u2_acceptor: str = cesar_non_canon_u2_acceptor
@@ -864,7 +864,7 @@ class CesarPreprocessor(CommandLineManager):
         """
         """
         cmd: str = (
-            f'{self.twobittofa_binary} -seq={chrom} -start={start} -end={stop} '
+            f'{self.twobit2fa_binary} -seq={chrom} -start={start} -end={stop} '
             f'{self.query} stdout'
         )
         res: str = self._exec(cmd, 'ERROR: Query search space extraction failed')
