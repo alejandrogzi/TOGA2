@@ -70,7 +70,7 @@ class PreprocessingScheduler(CommandLineManager):
         'joblist_file', 'segments',
         'fragmented_projections', 'jobnum', 'projections_per_command',
         'max_chain_number', 'orthologs_only', 'one2one_only', 
-        'parallel_execution', 'twobittofa_binary',
+        'parallel_execution', 'twobit2fa_binary',
         'disable_spanning_chains', 'no_inference', 'memory_limit',
         'max_space_size', 'extrapolation_modifier', 'minimal_covered_fraction',
         'exon_locus_flank',
@@ -128,7 +128,7 @@ class PreprocessingScheduler(CommandLineManager):
         separate_splice_site_treatment: Optional[bool] = False,
         assembly_gap_size: Optional[int] = MIN_ASMBL_GAP_SIZE,
         u12: Optional[Union[click.Path, None]] = None,
-        twobittofa_binary: Optional[Union[click.Path, None]] = None,
+        twobit2fa_binary: Optional[Union[click.Path, None]] = None,
         spliceai_dir: Optional[Union[click.Path, None]] = None,
         bigwig2wig_binary: Optional[Union[click.Path, None]] = None,
         min_splice_prob: Optional[bool] = 0.5,
@@ -190,15 +190,15 @@ class PreprocessingScheduler(CommandLineManager):
         self.u12: Union[click.Path, None] = u12
         self.spliceai_dir: Union[click.Path, None] = spliceai_dir
 
-        if twobittofa_binary is None:
+        if twobit2fa_binary is None:
             self._to_log('twoBitToFa binary was not set; looking for the binary in $PATH')
             tb2f_in_path: str = which('twoBitToFa')
             if tb2f_in_path is not None:
-                self.twobittofa_binary: click.Path = Path(tb2f_in_path).absolute()
+                self.twobit2fa_binary: click.Path = Path(tb2f_in_path).absolute()
             else:
                 self._die('Binary twoBitToFa not found in $PATH, with no defaults')
         else:
-            self.twobittofa_binary: click.Path = twobittofa_binary
+            self.twobit2fa_binary: click.Path = twobit2fa_binary
 
         if bigwig2wig_binary is None:
             self._to_log('bigWigToWig binary was not set; looking for the binary in $PATH')
@@ -220,10 +220,6 @@ class PreprocessingScheduler(CommandLineManager):
         self.toga1: bool = toga1_compatible
         self.toga1_plus_cesar: bool = toga1_plus_corrected_cesar
 
-        # self.tr2orth: Dict[str, List[str]] = defaultdict(list)
-        # self.tr2par: Dict[str, List[str]] = defaultdict(list)
-        # self.tr2trans: Dict[str, List[str]] = defaultdict(list)
-        # self.tr2pgenes: Dict[str, List[str]] = defaultdict(list)
         self.chain2trs: Dict[str, List[str]] = defaultdict(list)
         self.transcript_spans: Dict[str, int] = {}
         self.job2cmds: List[int, Tuple[str, str]] = defaultdict(list)
@@ -440,7 +436,6 @@ class PreprocessingScheduler(CommandLineManager):
         """
         Writes job files and a jo
         """
-        # print(f'{self.ppgene_list=}')
         with open(self.joblist_file, 'w') as h1:
             for jobid, inputs in self.job2cmds.items():
                 job_file: str = Path(
@@ -472,7 +467,7 @@ class PreprocessingScheduler(CommandLineManager):
                             f' --max_space_size {self.max_space_size}'
                             f' --extrapolation_modifier {self.extrapolation_modifier}'
                             f' --exon_locus_flank {self.exon_locus_flank}'
-                            f' --twobittofa_binary {self.twobittofa_binary}'
+                            f' --twobit2fa_binary {self.twobit2fa_binary}'
                             f' --bigwig2wig_binary {self.bigwig2wig_binary}'
                         )
                         if self.toga1 and not self.toga1_plus_cesar:
@@ -494,7 +489,6 @@ class PreprocessingScheduler(CommandLineManager):
                         if self.u12 is not None:
                             cmd += f' --u12 {self.u12}'
                         if self.annotate_ppgenes:
-                            # print(f'{trs=}')
                             ppgenes_in_batch: List[str] = [x for x in trs.split(',') if f'{x}#{chain}' in self.ppgene_list]
                             if ppgenes_in_batch:
                                 ppgene_str: str = ','.join(ppgenes_in_batch)
@@ -877,7 +871,7 @@ class PreprocessingScheduler(CommandLineManager):
     )
 )
 @click.option(
-    '--twobittofa_binary',
+    '--twobit2fa_binary',
     '-2b2f',
     type=click.Path(exists=True),
     metavar='TWOBITTOFA_BINARY',

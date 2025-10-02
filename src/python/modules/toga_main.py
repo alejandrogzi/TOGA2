@@ -1886,7 +1886,7 @@ class TogaMain(CommandLineManager):
             'query_chrom_sizes': self.query_contig_size_file, 
             'job_directory': self.preprocessing_job_dir,
             'preprocessing_directory': self.preprocessing_res_dir,
-            'twobittofa_binary': self.twobittofa_binary,
+            'twobit2fa_binary': self.twobittofa_binary,
             'job_number': self.preprocessing_job_num,
             'max_chain_number': self.max_chains_per_transcript,
             'max_space_size': self.max_search_space_size,
