@@ -902,7 +902,9 @@ class CesarPreprocessor(CommandLineManager):
             q_chain_start: int = chain_meta[5]
             q_chain_stop: int = chain_meta[6]
             q_strand: bool = chain_meta[7]
-            q_chrom_size: int = self.query_chrom_sizes[q_chrom]
+            q_chrom_size: int = self.query_chrom_sizes.get(q_chrom)
+            if q_chrom_size is None:
+                self._die('Unknown size value for query contig "%s"' % q_chrom)
             for tr in self.annot_entries:
                 self._to_log('Retrieving subchain for transcript %s' % tr)
                 codirected: bool = t_strand == q_strand
@@ -1061,7 +1063,9 @@ class CesarPreprocessor(CommandLineManager):
         for tr, entry in self.annot_entries.items():
             # init2 = datetime.now()
             chrom: str = entry.chrom
-            chrom_size: int = self.ref_chrom_sizes[chrom]
+            chrom_size: int = self.ref_chrom_sizes.get(chrom)
+            if chrom_size is None:
+                self._die('Unknown size value for reference contig "%s"' % chrom)
             strand: str = '+' if entry.strand else '-'
             for e_num, exon in entry.exons.items():
                 start, stop = sorted((exon.start, exon.stop))
@@ -1206,7 +1210,9 @@ class CesarPreprocessor(CommandLineManager):
         if min_exon is None:
             return None
         chrom: str = chain.qchrom if chain else segment.chrom
-        chrom_len: int = self.query_chrom_sizes[chrom]
+        chrom_len: int = self.query_chrom_sizes.get(chrom)
+        if chrom_len is None:
+            self._die('Unknown size value for query contig "%s"' % chrom)
         first_exon, last_exon = self.get_group_boundaries(
             min_exon, max_exon, c_id, tr, group
         )
@@ -1491,7 +1497,9 @@ class CesarPreprocessor(CommandLineManager):
                     )
                     ## the rest of the procedure is held within a specialized class instance
                     chrom: str = chain.qchrom if chain is not None else segment.chrom
-                    chrom_size: int = self.query_chrom_sizes[chrom]
+                    chrom_size: int = self.query_chrom_sizes.get(chrom)
+                    if chrom_size is None:
+                        self._die('Unknown size value for query contig "%s"' % chrom)
                     proj: ProjectionGroup = ProjectionGroup(
                         chain,
                         self.annot_entries[tr],
@@ -1612,7 +1620,9 @@ class CesarPreprocessor(CommandLineManager):
                         out_of_chain_exons: Set[int] = {
                             x for x in exon_group if x in proj.out_of_chain_exons
                         }
-                        chrom_len: int = self.query_chrom_sizes[proj.chrom]
+                        chrom_len: int = self.query_chrom_sizes.get(proj.chrom)
+                        if chrom_len is None:
+                            self._die('Unknown size value for query contig "%s"' % proj.chrom)
                         # print(f'{group_start=}, {group_stop=}, {proj.missing=}, {proj.gap_located=}')
                         # if any(x not in proj.missing and x not in proj.gap_located for x in exon_group):
                         #     self._to_log(f'Adding exon flanks to search space of group {exon_group}')
