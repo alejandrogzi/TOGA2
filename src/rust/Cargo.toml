@@ -19,6 +19,7 @@ fxhash = "0.2.1"
 get-size = "0.1.4"
 memchr = "2.7.5"
 num-traits = "0.2.19"
+packbed = "0.0.8"
 phf = { version = "0.13.1", features = ["macros"] }
 quick-xml = "0.38.3"
 regex = "1.11.2"
@@ -75,3 +76,8 @@ path = "src/bin/plot_projection.rs"
 edition = "2021"
 name = "combine_plots"
 path = "src/bin/combine_plots.rs"
+
+[[bin]]
+edition = "2021"
+name = "intograte"
+path = "src/bin/intograte.rs"

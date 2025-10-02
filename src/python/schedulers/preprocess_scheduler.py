@@ -31,15 +31,6 @@ PARENT: str = os.sep.join(LOCATION.split(os.sep)[:-1])
 # sys.path.append(PARENT)
 
 CESAR_PREPROCESS_SCRIPT: str = os.path.join(PARENT, 'cesar_preprocess.py')
-HL_BW2W_PATH: str = os.path.join(
-    os.path.sep,
-    'projects',
-    'hillerlab',
-    'genome',
-    'bin',
-    'x86_64',
-    'bigWigToWig'
-)
 HG38_CANON_U2_ACCEPTOR: str = os.path.join(TOGA2_ROOT, *HG38_CANON_U2_ACCEPTOR)
 HG38_CANON_U2_DONOR: str = os.path.join(TOGA2_ROOT, *HG38_CANON_U2_DONOR)
 HG38_NON_CANON_U2_ACCEPTOR: str = os.path.join(TOGA2_ROOT, *HG38_NON_CANON_U2_ACCEPTOR)
@@ -197,11 +188,18 @@ class PreprocessingScheduler(CommandLineManager):
         self.u12: Union[click.Path, None] = u12
         self.spliceai_dir: Union[click.Path, None] = spliceai_dir
         if bigwig2wig_binary is None:
+            self._to_log('bigWigToWig binary was not set; looking for the binary in $PATH')
             bw2w_in_path: str = which('bigWigToWig')
             if bw2w_in_path is not None:
                 self.bigwig2wig_binary: click.Path = Path(bw2w_in_path).absolute()
             else:
-                self.bigwig2wig_binary: click.Path = HL_BW2W_PATH
+                if self.spliceai_dir is None:
+                    self._to_log(
+                        'Binary bigWigToWig not found in $PATH, with no defaults',
+                        'warning'
+                    )
+                else:
+                    self._die('Binary bigWigToWig not found in $PATH, with no defaults')
         else:
             self.bigwig2wig_binary: click.Path = bigwig2wig_binary
         self.min_splice_prob: float = max(0.0, min(min_splice_prob, 1.0))
@@ -879,8 +877,7 @@ class PreprocessingScheduler(CommandLineManager):
     metavar='BIGWIG2WIG_BINARY',
     default=None,
     help=(
-        'A path to the UCSC bigWigToWig binary; if none is provided or found '
-        'in PATH, default is set to Hiller Lab Delta cluster utility location'
+        'A path to the UCSC bigWigToWig binary'
     )
 )
 @click.option(

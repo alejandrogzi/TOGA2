@@ -1802,13 +1802,17 @@ def cookbook() -> None:
     help='A path to store the results in'
 )
 def test(output: Optional[click.Path]) -> None:
-    from src.python.modules.toga_configured import Toga2ConfiguredLauncher
+    # from src.python.modules.toga_configured import Toga2ConfiguredLauncher
+    # from src.python.modules.toga_main import TogaMain
+    # config_file: str = Constants.DEFAULT_CONFIG
+    # override: str = f'--output {output} -v'
+    # with open(config_file, 'r') as h:
+    #     args: List[str] = Toga2ConfiguredLauncher(h, override=override).run()
+    #     TogaMain(**args)
+    from src.python.modules.defaults import DEFAULT_ARGS
     from src.python.modules.toga_main import TogaMain
-    config_file: str = Constants.DEFAULT_CONFIG
-    override: str = f'--output {output} -v'
-    with open(config_file, 'r') as h:
-        args: List[str] = Toga2ConfiguredLauncher(h, override=override).run()
-        TogaMain(**args)
+    DEFAULT_ARGS['output'] = output
+    TogaMain(**DEFAULT_ARGS)
 
 
 if __name__ == '__main__':

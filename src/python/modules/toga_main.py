@@ -1907,6 +1907,7 @@ class TogaMain(CommandLineManager):
             'processed_pseudogene_report': self.processed_pseudogene_report,
             'rejection_report': self.preprocessing_rejection_log,
             'log_name': self.project_id,
+            'bigwig2wig_binary': self.bigwig2wig_binary,
             'verbose': True
         }
         if self.toga1 and not self.toga1_plus_cesar:
@@ -1929,7 +1930,6 @@ class TogaMain(CommandLineManager):
             kwargs['separate_splice_site_treatment'] = True
         if self.spliceai_dir is not None:
             kwargs['spliceai_dir'] = self.spliceai_dir
-            kwargs['bigwig2wig_binary'] = self.bigwig2wig_binary
             kwargs['min_splice_prob'] = self.min_splice_prob
         if self.annotate_ppgenes:
             kwargs['annotate_processed_pseudogenes'] = True
@@ -1960,6 +1960,7 @@ class TogaMain(CommandLineManager):
         self._create_output_stub('preprocessing_report')
         # if not self.enable_spanning_chains:
         self._create_output_stub('spanning_chain_coords')
+        has_dirs: bool = False
         for dir_name in os.listdir(self.preprocessing_res_dir):
             dir_path: str = os.path.join(self.preprocessing_res_dir, dir_name)
             ok_file: str = os.path.join(dir_path, Constants.OK_FILE)
@@ -1992,9 +1993,9 @@ class TogaMain(CommandLineManager):
                     span_aggr_cmd, 
                     'Spanning chains coordinates aggregation failed at batch %s' % dir_name
                 )
-        if self.failed_preprocessing_batches and not self.ignore_crashed_parallel_batches:
+            has_dirs = True
+        if (self.failed_preprocessing_batches or not has_dirs) and not self.ignore_crashed_parallel_batches:
             self._write_failed_batches_and_exit('preprocessing')
-        ## TODO: Here goes a sanity check
 
     def schedule_alignment_jobs(self) -> None:
         """

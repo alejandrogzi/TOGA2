@@ -67,15 +67,6 @@ HL_CESAR_PATH: str = os.path.join(
     'CESAR2.0',
     'cesar'
 )
-HL_BW2W_PATH: str = os.path.join(
-    os.path.sep,
-    'projects',
-    'hillerlab',
-    'genome',
-    'bin',
-    'x86_64',
-    'bigWigToWig'
-)
 
 ## Shell oneliners
 SPLICEAI_PROCESS_SCRIPT: str = (

@@ -350,8 +350,7 @@ MISSING: str = 'M'
     metavar='BIGWIG2WIG_BINARY',
     default=None,
     help=(
-        'A path to the UCSC bigWigToWig binary; default is set to Hiller Lab '
-        'Delta cluster utility location'
+        'A path to the UCSC bigWigToWig binary;'
     )
 )
 @click.option(
