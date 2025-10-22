@@ -118,9 +118,16 @@ def parts(lst: Iterable[Any], n: int =3):
     return [lst[i : i + n] for i in iter(range(0, len(lst), n))]
 
 
+def base_proj_name(projection: str) -> str:
+    """Removes the metadata suffixes from the projection name"""
+    return projection.split('$')[0].replace('#paralog', '').replace('#retro', '')
+
+
 def get_proj2trans(projection: str) -> Tuple[str, str]:
     """Safely extract transcript name from the chain projection name"""
     data: List[str] = projection.split('#')
+    if data[-1] == 'retro' or data[-1] == 'paralog':
+        data = data[:-1]
     return '#'.join(data[:-1]), data[-1]
 
 
@@ -563,6 +570,7 @@ class CommandLineManager:
         pr: subprocess.Pipe = subprocess.Popen(
             cmd, 
             shell=True,
+            executable='bash',
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE if gather_stdout else None,
             stderr=subprocess.PIPE
