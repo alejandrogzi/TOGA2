@@ -22,3 +22,5 @@
     * Error-exit if all batches for a given step failed prior to ok-file check
     * Projections discarded at gene tree filtering step now removed from the final output files
     * Added post-gene-tree orthology resolution step to the main logging channel
+    * 'missing_' query gene inference;
+    * Parially Intact consistently removed from accepted retrogene/trusted second-level ortholog statuses
