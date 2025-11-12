@@ -39,7 +39,7 @@ else:
 PROJECTION: str = 'PROJECTION'
 TR_META_HEADER: str = 'projection'
 MISSING: Tuple[str, str] = ('M', 'N')
-EXTENDED_HIGH_CONFIDENCE: Tuple[str, str] = ('FI', 'I') ## NOTE: Previously ('FI', 'I') => likely a bug
+EXTENDED_HIGH_CONFIDENCE: Tuple[str, str] = ('FI', 'I') ## NOTE: Previously ('FI', 'PI') => likely a bug
 MIN_RELIABLE_EXON_COV: float = 0.6
 
 REJ_ORTH_REASON: str = '\t'.join(
@@ -703,8 +703,12 @@ class QueryGeneCollapser(CommandLineManager):
                 if basename_out in self.discarded_ppgenes:
                     continue
                 graph_name_out: str = segment_base(proj_out.name)
-                out_is_paralog: bool = basename_out in self.paralog_list
-                out_is_pseudo: bool = basename_out in self.proc_pseudogene_list
+                out_is_paralog: bool = (
+                    proj_out.name in self.paralog_list or basename_out in self.paralog_list
+                )
+                out_is_pseudo: bool = (
+                    proj_out.name in self.proc_pseudogene_list or basename_out in self.proc_pseudogene_list
+                )
                 out_is_lost: bool = basename_out in self.lost_projections
                 out_is_intact: bool = self.proj2status[basename_out] in EXTENDED_HIGH_CONFIDENCE
                 out_non_orth: bool = out_is_paralog or out_is_pseudo
@@ -746,8 +750,12 @@ class QueryGeneCollapser(CommandLineManager):
                         break
                     if proj_out.strand != proj_in.strand:
                         continue
-                    in_is_paralog: bool = proj_in.name in self.paralog_list
-                    in_is_pseudo: bool = proj_in.name in self.proc_pseudogene_list
+                    in_is_paralog: bool = (
+                        proj_in.name in self.paralog_list or basename_in in self.paralog_list
+                    )
+                    in_is_pseudo: bool = (
+                        proj_in.name in self.proc_pseudogene_list or basename_in in self.proc_pseudogene_list
+                    )
                     in_non_orth: bool = in_is_paralog or in_is_pseudo
                     # if in_is_pseudo:
                     #     continue
