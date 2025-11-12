@@ -146,7 +146,7 @@ class QueryGeneNamer(CommandLineManager):
     """
     __slots__: Tuple[str] = (
         'log_file', 'orthology_file', 'query_gene_table', 
-        'query_gene_bed', 'gene2new_name',
+        'query_gene_bed', 'gene2new_name', 'tr2new_gene_name',
         'ref_gene2tr', 'ref_tr2gene',
         'discarded', 'paralogs', 'ppgenes',
         'loss_status'
@@ -207,6 +207,7 @@ class QueryGeneNamer(CommandLineManager):
             'and adding them to the orthology classification file'
         )
         self.gene2new_name: Dict[str, str] = {}
+        self.tr2new_gene_name: Dict[str, str] = {}
         self.modify_orthology_classification(orthology_results)
         self._to_log('Renaming query genes in the gene-to-transcript mapping file')
         self.modify_gene_mapping(query_gene_file)
@@ -300,6 +301,7 @@ class QueryGeneNamer(CommandLineManager):
                 for line in lines:
                     line[2] = new_query_name
                     h.write('\t'.join(line) + '\n')
+                    self.tr2new_gene_name[line[3]] = new_query_name
 
     def modify_gene_mapping(self, file: TextIO) -> None:
         """
@@ -351,6 +353,7 @@ class QueryGeneNamer(CommandLineManager):
                 ## check if any of the projections must be removed from the final file
                 projs = [x for x in projs if base_proj_name(x) not in self.discarded]
                 if not projs:
+                    self._to_log('Dropping gene %s which no longer has any valid projections' % gene)
                     continue
                 trs: List[str] = [get_proj2trans(x)[0] for x in projs]
                 genes: Set[str] = {
@@ -369,6 +372,7 @@ class QueryGeneNamer(CommandLineManager):
                 else:
                     projs = [x for x in projs if base_proj_name(x) not in self.ppgenes]
                     if not projs:
+                        self._to_log('Dropping gene %s which no longer has any valid projections' % gene)
                         continue
                     paralog_num: int = sum(base_proj_name(x) in self.paralogs for x in projs)
                     if paralog_num == len(projs):
@@ -377,13 +381,22 @@ class QueryGeneNamer(CommandLineManager):
                         projs = [x for x in projs if base_proj_name(x) not in self.paralogs]
                         if not projs:
                             continue
-                        statuses: List[str] = [
-                            self.loss_status.get(base_proj_name(x), 'L') for x in self.loss_status
-                        ]
-                        if all(x == 'M' for x in statuses):
-                            new_query_name = f'missing_{new_query_name}'
-                        else:
-                            new_query_name = f'lost_{new_query_name}'
+                        ## a workaround for post-hoc patching purposes (patch for v2.0.6)
+                        has_known_name: bool = False
+                        known_names: Set[str] = {self.tr2new_gene_name.get(base_proj_name(x), '') for x in projs}
+                        if len(known_names) == 1:
+                            candidate_name: str = known_names.pop()
+                            if candidate_name and 'reg_' not in candidate_name:
+                                new_query_name = candidate_name
+                                has_known_name = True
+                        if not has_known_name:
+                            statuses: List[str] = [
+                                self.loss_status.get(base_proj_name(x), 'L') for x in projs
+                            ]
+                            if all(x == 'M' for x in statuses):
+                                new_query_name = f'missing_{new_query_name}'
+                            else:
+                                new_query_name = f'lost_{new_query_name}'
                 self.gene2new_name[gene] = new_query_name
                 for proj in projs:
                     h.write(new_query_name + '\t' + proj + '\n')
@@ -411,6 +424,7 @@ class QueryGeneNamer(CommandLineManager):
                         'warning'
                     )
                     gene_name: str = old_name
+                    continue
                 else:
                     gene_name: str = self.gene2new_name[old_name]
                 data[3] = gene_name
