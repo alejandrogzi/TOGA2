@@ -12,13 +12,13 @@ TOGA2 is currently in early access phase. This means, certain TOGA2 features and
 > 
 
 ```bash
-git clone https://github.com/hillerlab/TOGA2
+git clone --recurse-submodules https://github.com/hillerlab/TOGA2
 cd TOGA2
 make
 ```
 Since the Make directive also installs Python packages globally, you might want to create a dedicated virtual environment beforehand (Python version 3.9 or higher:
 ```bash
-git clone https://github.com/hillerlab/TOGA2
+git clone --recurse-submodules https://github.com/hillerlab/TOGA2
 cd TOGA2
 python3 -m venv toga2
 source toga2/bin/activate
@@ -28,7 +28,7 @@ make
 ### via Apptainer
 Container image definition file for Apptainer is provided with TOGA2 under `supply/apptainer.def`. To build the container, make sure you have Apptainer installed, then run the following commands:
 ```bash
-git clone https://github.com/hillerlab/TOGA2
+git clone --recurse-submodules https://github.com/hillerlab/TOGA2
 TMPDIR=${tmp_dir} apptainer build ${container.sif} supply/apptainer.def
 ```
 where:
