@@ -4,12 +4,19 @@
 Actual CESAR wrapper for TOGA 1.5+
 """
 
+# import numpy as np
+import os
 from collections import defaultdict
-from datetime import datetime
-from filelock import FileLock  # remove if not needed
 
 # from GLP_values import * # TODO: make sure that paths to local packages are provided correctly
 from math import ceil
+
+# from twobitreader import TwoBitFile
+from typing import Dict, Iterable, List, Optional, Set, Tuple, Union
+
+import click
+import h5py
+from filelock import FileLock  # remove if not needed
 from modules.cesar_wrapper_constants import *
 from modules.cesar_wrapper_executables import *
 from modules.constants import Constants
@@ -17,22 +24,12 @@ from modules.intron_gain_check import *
 from modules.preprocessing import cesar_memory_check
 from modules.processed_segment import *
 from modules.shared import (
-    CommandLineManager,
     CONTEXT_SETTINGS,
+    CommandLineManager,
     dir_name_by_date,
     get_upper_dir,
     hex_code,
 )
-
-# from twobitreader import TwoBitFile
-from typing import Dict, Iterable, List, Optional, Set, Tuple, Union
-
-import click
-import h5py
-import logging
-
-# import numpy as np
-import os
 
 # logging.basicConfig(level=logging.INFO)
 

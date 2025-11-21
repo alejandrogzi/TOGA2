@@ -5,17 +5,17 @@ Atomic script for query genome SpliceAI annotation;
 invoked in parallel with `toga2.py spliceai command`
 """
 
-from modules.spliceai_manager import STRANDS
+import os
+from typing import Dict, Iterable, List, Optional, Tuple, Union
+
+import click
 from modules.shared import (
     CONTEXT_SETTINGS,
     CommandLineManager,
     dir_name_by_date,
     hex_code,
 )
-from typing import Dict, Iterable, List, Optional, Tuple, Union
-
-import click
-import os
+from modules.spliceai_manager import STRANDS
 
 __author__ = "Yury V. Malovichko"
 __credits__ = ("Michael Hiller", "Lucas Koch")
@@ -221,10 +221,10 @@ class SpliceAiRunner(CommandLineManager):
         output: Union[str, None] = self._exec(cmd, "twoBitToFa call failed:")
 
         ## lazy imports start here
+        import numpy as np
         from keras.models import load_model
         from pkg_resources import resource_filename
         from spliceai.utils import one_hot_encode
-        import numpy as np
 
         # this code was provided by the SpliceAI authors
         ## import the models and

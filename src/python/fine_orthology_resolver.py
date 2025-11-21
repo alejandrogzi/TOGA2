@@ -5,21 +5,19 @@ Resolves many2many orthologies with PRANK+RAxML pipeline
 """
 
 import os
-import sys
+from collections import defaultdict
+from shutil import which
+from typing import Dict, List, Optional, Tuple, Union
+
+import click
 
 # LOCATION: str = os.path.dirname(os.path.abspath(__file__))
 # PARENT: str = os.sep.join(LOCATION.split(os.sep)[:-1])
 # sys.path.extend([LOCATION, PARENT])
-
 from Bio import Phylo
-from collections import defaultdict
 from modules.constants import IQTREE_ACCEPTED_MODELS, PHYLO_NOT_FOUND
-from modules.shared import CommandLineManager, CONTEXT_SETTINGS
-from shutil import which
+from modules.shared import CONTEXT_SETTINGS, CommandLineManager
 from modules.tree_analysis import can_resolve, make_cat_tree
-from typing import Dict, List, Optional, Tuple, Union
-
-import click
 
 __author__ = ("Amy Stephen", "Yury V. Malovichko")
 __year__ = "2024"

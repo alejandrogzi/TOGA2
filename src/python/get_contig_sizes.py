@@ -7,12 +7,11 @@ Infers contig size from the FASTA file
 # PARENT: str = os.sep.join(LOCATION.split(os.sep)[:-1])
 # sys.path.extend([LOCATION, PARENT])
 
-from modules.shared import CONTEXT_SETTINGS
-
-import click
-
 # import os
 import sys
+
+import click
+from modules.shared import CONTEXT_SETTINGS
 
 __author__ = "Yury V. Malovichko"
 __year__ = "2024"

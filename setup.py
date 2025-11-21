@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
 
-from setuptools import Extension, setup
-from Cython.Build import cythonize
-from typing import List
-
 import os
 import platform
+from typing import List
+
+from Cython.Build import cythonize
+from setuptools import Extension, setup
 
 C_FLAGS: List[str] = ["-Wall", "-Wextra", "-O2", "-g", "-std=c99"]
 if platform.machine() == "arm64":

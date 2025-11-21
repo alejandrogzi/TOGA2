@@ -10,28 +10,33 @@ __author__ = "Yury V. Malovichko"
 __credits__ = ["Bogdan Kirilenko", "Michael Hiller"]
 __year__ = "2024"
 
+import os
 from collections import Counter, defaultdict
-from filelock import FileLock  # remove if not needed
-from numpy import array, str_
 from math import ceil
+from pathlib import Path
+from typing import Dict, Iterable, List, Optional, Set, TextIO, Tuple, Union
+
+import click
+import h5py
+from filelock import FileLock  # remove if not needed
 from modules.cesar_wrapper_constants import (
     ACCEPTOR_SITE,
     ACCEPTOR_SITE_U12,
     DONOR_SITE,
     DONOR_SITE_U12,
     EXTRA_FLANK,
+    FIRST_ACCEPTOR,
     FLANK_SPACE,
     HG38_CANON_U2_ACCEPTOR,
     HG38_CANON_U2_DONOR,
-    HG38_NON_CANON_U2_ACCEPTOR,
-    HG38_NON_CANON_U2_DONOR,
     HG38_CANON_U12_ACCEPTOR,
     HG38_CANON_U12_DONOR,
+    HG38_NON_CANON_U2_ACCEPTOR,
+    HG38_NON_CANON_U2_DONOR,
     HG38_NON_CANON_U12_ACCEPTOR,
     HG38_NON_CANON_U12_DONOR,
-    FIRST_ACCEPTOR,
-    LAST_DONOR,
     LARGE_EXON_UNALIGNED_WARNING,
+    LAST_DONOR,
     MEM_UNALIGNED_WARNING,
     MIN_ASMBL_GAP_SIZE,
     MIN_REF_LEN_PERC,
@@ -44,34 +49,29 @@ from modules.cesar_wrapper_constants import (
 from modules.preprocessing import (
     AnnotationEntry,
     Exon,
-    ExonDict,
     Exon2BlockMapper,
+    ExonDict,
     ProjectionCoverageData,
     ProjectionGroup,
     Segment,
     cesar_memory_check,
-    get_chain,
     find_gaps,
+    get_chain,
     intersect_exons_to_blocks,
     parse_extr_exon_fasta,
     prepare_exons,
 )
-from pathlib import Path
-from string_splitter import transcriptwise_subchains  ## TODO: Rename the module
 from modules.shared import (
-    CommandLineManager,
     CONTEXT_SETTINGS,
+    CommandLineManager,
     dir_name_by_date,
-    intersection,
     hex_code,
+    intersection,
     parts,
     reverse_complement,
 )
-from typing import Dict, Iterable, List, Optional, Set, TextIO, Tuple, Union
-
-import click
-import h5py
-import os
+from numpy import array, str_
+from string_splitter import transcriptwise_subchains  ## TODO: Rename the module
 
 ## create or update the needed constants
 LOCATION: str = os.path.dirname(os.path.abspath(__file__))

@@ -11,12 +11,13 @@ LOCATION: str = os.path.dirname(os.path.abspath(__file__))
 PARENT: str = os.sep.join(LOCATION.split(os.sep)[:-1])
 sys.path.extend([LOCATION, PARENT])
 
-from modules.constants import TOGA2_SLOT2ARG
-from modules.shared import CommandLineManager, CONTEXT_SETTINGS
-from toga2 import __version__, TogaMain
-from typing import Tuple, Dict, List
+from typing import Dict, List, Tuple
 
 import click
+from modules.constants import TOGA2_SLOT2ARG
+from modules.shared import CONTEXT_SETTINGS, CommandLineManager
+
+from toga2 import TogaMain, __version__
 
 __author__ = "Yury V. Malovichko"
 __year__ = "2024"
@@ -28,7 +29,7 @@ REF: str = "ref_2bit"
 QUERY: str = "query_2bit"
 CHAIN: str = "chain_file"
 ANNOT: str = "ref_annotation"
-MANDATORY_ARGS: Tuple[str] = (REF, QUERY, CHAIN, ANNOT)
+MANDATORY_ARGS: Tuple[str, ...] = (REF, QUERY, CHAIN, ANNOT)
 TRUE: str = "True"
 FALSE: str = "False"
 NONE: str = "None"

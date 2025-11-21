@@ -10,23 +10,27 @@ modules.processor.unit for each chain: genes task.
 import os
 import sys
 
+from xgboost.core import Objective
+
 LOCATION: str = os.path.dirname(os.path.abspath(__file__))
 PARENT: str = os.sep.join(LOCATION.split(os.sep)[:-1])
 sys.path.extend([LOCATION, PARENT])
 
 from datetime import datetime as dt
-from modules.overlap_select import overlap_select
-from modules.common import bed_extract_id
-from modules.common import make_cds_track
-from modules.common import die
-from modules.common import load_chain_dict
-from modules.common import setup_logger
-from modules.common import to_log
-from modules.shared import CommandLineManager, CONTEXT_SETTINGS
 from typing import Any, Dict, List, Optional, Tuple, Union
-# from version import __version__
 
+# from version import __version__
 import click
+from modules.common import (
+    bed_extract_id,
+    die,
+    load_chain_dict,
+    make_cds_track,
+    setup_logger,
+    to_log,
+)
+from modules.overlap_select import overlap_select
+from modules.shared import CONTEXT_SETTINGS, CommandLineManager
 
 __author__ = ("Bogdan M. Kirilenko", "Yury V. Malovichko")
 
@@ -319,7 +323,7 @@ def extend_bed_lines(
 
 def gene2clipped_spans(
     bed_lines: str, gene: str, start: int, stop: int
-) -> Tuple[int, int]:
+) -> Optional[Tuple[int, int]]:
     """
     Reports the total exon and intron length confined between the two coordinates
     """

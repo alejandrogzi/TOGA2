@@ -6,16 +6,16 @@ Given a projection feature table, classifies projections in terms of their ortho
 
 ## TODO: Move to 'modules'?
 
+import os
 from collections import Counter, defaultdict
-from modules.shared import CONTEXT_SETTINGS, CommandLineManager
 from typing import Any, Dict, Iterable, List, Optional, Set
 
 import click
 import joblib
-import os
 import numpy as np
 import pandas as pd
 import xgboost as xgb
+from modules.shared import CONTEXT_SETTINGS, CommandLineManager
 
 __author__ = "Yury V. Malovichko"
 __year__ = "2024"

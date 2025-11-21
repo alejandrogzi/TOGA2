@@ -5,11 +5,10 @@ Extracts chain-transcript pair features for orthology classification
 """
 
 from dataclasses import dataclass
-from modules.shared import CONTEXT_SETTINGS
-from typing import Dict, List
+from typing import List
 
 import click
-import os
+from modules.shared import CONTEXT_SETTINGS
 
 __author__ = "Yury V. Malovichko"
 __year__ = "2024"

@@ -9,6 +9,7 @@ import os
 from typing import List, Optional
 
 import click
+
 from src.python.modules.cesar_wrapper_constants import (
     DEF_BLOSUM_FILE,
     FIRST_ACCEPTOR,
