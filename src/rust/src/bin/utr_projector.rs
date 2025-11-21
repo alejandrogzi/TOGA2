@@ -375,6 +375,13 @@ fn main() {
                 .last()
                 .unwrap(); // TODO: Does not look safe
             let proj_name = &format!("{}#{}", tr_name, chain_id);
+            let utr_chrom = utr_proj.chrom().unwrap();
+            let proj_chrom = query_tr2bed.get(proj_name).unwrap().chrom().unwrap();
+            if utr_chrom != proj_chrom {
+                println!("Non-matching chromosomes between projection and graft!");
+                println!("projection={:#?}", query_tr2bed.get(proj_name).unwrap());
+                println!("graft={:#?}", utr_proj);
+            }
             let query_strand = query_tr2bed.get(proj_name).unwrap().strand().unwrap();
             let (is_adjacent, side) = ref_utr2features.get(utr_name).unwrap();
             // do not add 5'-UTRs if the first exon was not annotated
@@ -418,9 +425,6 @@ fn main() {
                         utr_proj.start().unwrap().checked_sub(cds_end).unwrap_or(0)
                     }
                 };
-                if *chain_id == 8083 && tr_name == "ENST00000307845.8#HPCAL1" {
-                    println!("abs_distance={}, rel_distance={}, distance_in_query={}", args.abs_distance_threshold, rel_distance, distance_in_query);
-                }
                 if distance_in_query > *rel_distance && distance_in_query > args.abs_distance_threshold {continue}
             }
             let (append_upstream, append_downstream) = match (is_adjacent, side, query_strand) {
@@ -453,9 +457,6 @@ fn main() {
                     )
                     .unwrap_or(0);
                 if downstream_extend > args.abs_threshold && downstream_extend > *rel_size {continue}
-            }
-            if proj_name == "XM_036160658#Tagap1#58" {
-                println!("append_upstream={:?}, append_downstream={:?}", append_upstream, append_downstream);
             }
             query_tr2bed
                 .entry(proj_name.to_string())
