@@ -14,7 +14,6 @@ from .shared import (
     CommandLineManager, dir_name_by_date, 
     get_upper_dir, hex_dir_name
 )
-from pathlib import Path
 from shutil import copy, which
 from typing import Any, Dict, List, Optional, Union
 
@@ -290,9 +289,7 @@ class TogaMain(CommandLineManager):
         self.legacy_chain_feature_extraction: bool = legacy_chain_feature_extraction
         self.parallel_process_names: List[str] = []
 
-        self.output: str = Path(
-            output if output else dir_name_by_date('toga2_run')
-        ).absolute()
+        self.output: str = self._abspath(output if output else dir_name_by_date('toga2_run'))
         self.keep_tmp: bool = keep_temporary_files
 
         ## benchmarking flags
@@ -1528,6 +1525,10 @@ class TogaMain(CommandLineManager):
         ## check bigWigToWig binary
         for attr, default_name in Constants.BINARIES_TO_CHECK.items():
             if attr not in self.__slots__:
+                self._echo(
+                    'Binary %s has no corresponding toga_main.py attribute; skipping' % default_name,
+                    'warning'
+                )
                 continue
             if self.__getattribute__(attr) is None:
                 if default_name == 'prank':
@@ -1535,7 +1536,7 @@ class TogaMain(CommandLineManager):
                 else:
                     expected_path: str = os.path.join(BIN, default_name)
                 if os.path.exists(expected_path) and os.access(expected_path, os.X_OK):
-                    self._to_log('Found %s at bin/%s' % (default_name, default_name))
+                    self._to_log('Found %s at %s' % (default_name, expected_path))
                     self.__setattr__(attr, expected_path)
                     continue
                 self._to_log(
