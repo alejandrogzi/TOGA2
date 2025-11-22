@@ -50,6 +50,13 @@ MANIFEST
 pip-log.txt
 pip-delete-this-directory.txt
 
+# HL scripts
+call_toga2.py
+
+# Currently ignored files
+conda/
+supply/containers/
+
 # Unit test / coverage reports
 htmlcov/
 .tox/
