@@ -1,7 +1,5 @@
 #!/usr/bin/env python3
-"""
-
-"""
+""" """
 
 import os
 import sys
@@ -12,13 +10,16 @@ sys.path.extend([LOCATION, PARENT])
 
 from collections import defaultdict
 from datetime import datetime as dt
-from .constants import Headers
-from .shared import (
-    CONTEXT_SETTINGS, make_cds_track, flatten
-) ## TODO: most of legacy T1 code in this import line is no longer needed; remove in the stable version
 from typing import Dict, List, Optional
 
 import click
+
+from .constants import Headers
+from .shared import (
+    CONTEXT_SETTINGS,
+    flatten,
+    make_cds_track,
+)  ## TODO: most of legacy T1 code in this import line is no longer needed; remove in the stable version
 
 # artificial 0-scored points
 SOURCE = "SOURCE"
@@ -28,9 +29,9 @@ EXON_COV_THRESHOLD = 1.33
 MAX_OVERLAP = 250  # TODO: check whether 250 is a good option
 
 __author__ = "Ekaterina Osipova & Bogdan M. Kirilenko"
-__credits__ = ('Yury V. Malovichko')
-__year__ = '2024'
-__all__ = (None)
+__credits__ = "Yury V. Malovichko"
+__year__ = "2024"
+__all__ = None
 
 
 class Vertex:
@@ -104,6 +105,7 @@ class Graph:
             line = f"{elem}\t{self.vertices[elem].children}\n"
             lines.append(line)
         return "".join(lines)
+
 
 def read_gene_scores(score_file: str, threshold: float) -> Dict[str, List[str]]:
     """Read orthology_score.tsv file into a dict.
@@ -291,11 +293,11 @@ def get_average_exon_cov(chain_to_exon_cov, exon_num):
 
 
 def stitch_scaffolds(
-    chain_file: str, 
-    chain_scores_file: str, 
+    chain_file: str,
+    chain_scores_file: str,
     bed_file: str,
     orthology_threshold: Optional[float] = SCORE_THRESHOLD,
-    fragments_only: Optional[bool] = False
+    fragments_only: Optional[bool] = False,
 ) -> Dict[str, str]:
     """Stitch chains of fragmented orthologs."""
     # to_log("stitch_fragments: started stitching fragmented orthologous loci (if any)")
@@ -373,75 +375,60 @@ def stitch_scaffolds(
     # to_log(f"stitch fragments: identified {len(transcript_to_path)} fragmented transcripts")
     return transcript_to_path
 
+
 @click.command(context_settings=CONTEXT_SETTINGS, no_args_is_help=True)
-@click.argument(
-    'chain_file',
-    type=click.Path(exists=True),
-    metavar='CHAIN_FILE'
-)
-@click.argument(
-    'orthology_scores',
-    type=click.Path(exists=True),
-    metavar='ORTH_SCORES'
-)
-@click.argument(
-    'bed_file',
-    type=click.Path(exists=True),
-    metavar='REF_BED'
-)
+@click.argument("chain_file", type=click.Path(exists=True), metavar="CHAIN_FILE")
+@click.argument("orthology_scores", type=click.Path(exists=True), metavar="ORTH_SCORES")
+@click.argument("bed_file", type=click.Path(exists=True), metavar="REF_BED")
 @click.option(
-    '--output',
-    '-o',
-    type=click.File('w', lazy=True),
-    metavar='FILE',
+    "--output",
+    "-o",
+    type=click.File("w", lazy=True),
+    metavar="FILE",
     default=sys.stdout,
     show_default=False,
-    help='A path to an output file [default: stdout]'
+    help="A path to an output file [default: stdout]",
 )
 @click.option(
-    '--fragmented_only',
-    '-f',
+    "--fragmented_only",
+    "-f",
     is_flag=True,
     default=False,
     show_default=True,
-    help=(
-        'If set, only fragmented (multi-chain) projections are listed '
-        'in the output'
-    )
+    help=("If set, only fragmented (multi-chain) projections are listed in the output"),
 )
 @click.option(
-    '--orthology_threshold',
-    '-ot',
+    "--orthology_threshold",
+    "-ot",
     type=float,
-    metavar='FLOAT',
+    metavar="FLOAT",
     default=0.5,
     show_default=True,
-    help='Probability threshold for considering projections as orthologous'
+    help="Probability threshold for considering projections as orthologous",
 )
-
 def main(
     chain_file: click.Path,
     orthology_scores: click.Path,
     bed_file: click.Path,
     output: Optional[click.File],
     fragmented_only: Optional[bool],
-    orthology_threshold: Optional[float]
+    orthology_threshold: Optional[float],
 ) -> None:
-    """
-    """
+    """ """
     tr2chains: Dict[str, List[int]] = stitch_scaffolds(
-        chain_file, 
-        orthology_scores, 
+        chain_file,
+        orthology_scores,
         bed_file,
         orthology_threshold=orthology_threshold,
-        fragments_only=fragmented_only
+        fragments_only=fragmented_only,
     )
     output.write(Headers.FRAGM_PROJ_HEADER)
     for tr, chains in tr2chains.items():
-        chain_str: str = ','.join(map(str, sorted(map(int, chains))))
-        output.write(f'{tr}\t{chain_str}\n')
+        chain_str: str = ",".join(map(str, sorted(map(int, chains))))
+        output.write(f"{tr}\t{chain_str}\n")
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     t0 = dt.now()
     # setup_logger(args.log_file)
     main()

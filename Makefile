@@ -6,7 +6,7 @@ EXEC_SCRIPTS=cesar_exec.py cesar_preprocess.py classify_chains.py feature_extrac
 EXEC_MODULES=chain_bst_index.py get_names_from_bed.py
 VENV ?= false
 VENV_NAME ?= toga2
-.PHONY: all build build_cesar build_c build_cython build_rust check check_essentials check_managers check_python check_shell check_third_party chmod install_python_packages install_binaries train_models
+.PHONY: all build build_cesar build_c build_cython build_rust pull_submodules check check_essentials check_managers check_python check_shell check_third_party chmod install_python_packages install_binaries install_postoga train_models
 
 all: build
 
@@ -14,7 +14,7 @@ check: check_shell check_essentials check_managers
 
 build: chmod install check build_c build_cesar build_cython build_rust train_models
 
-install: install_binaries install_python install_third_party
+install: install_binaries install_python install_third_party install_postoga
 
 build_c:
 	if [ ARCH = "arm64" ]; then \
@@ -28,7 +28,7 @@ build_c:
 	echo ${DELIM}
 
 build_cesar:
-	cd CESAR2.0 && make 
+	cd CESAR2.0 && make
 	echo ${DELIM}
 
 build_cython:
@@ -39,6 +39,9 @@ build_rust:
 	cd src/rust && cargo build --release
 	echo ${DELIM}
 		cd bed2gtf && cargo build --release
+
+pull_submodules:
+	git submodule update --init --recursive
 
 check_essentials:
 	./${CHECK_DEPS} essentials
@@ -105,6 +108,11 @@ install_python:
 
 install_third_party:
 	./${CHECK_DEPS} install_third_party
+
+install_postoga:
+	source ${VENV_NAME}/bin/activate && \
+	cd postoga/rustools && \
+	maturin develop --release
 
 train_models:
 	src/python/train_model.py

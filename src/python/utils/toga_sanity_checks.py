@@ -1,4 +1,5 @@
 """This module contains functions to ensure TOGA arguments correctness."""
+
 import os
 import sys
 
@@ -6,13 +7,12 @@ LOCATION: str = os.path.dirname(os.path.abspath(__file__))
 PARENT: str = os.sep.join(LOCATION.split(os.sep)[:-1])
 sys.path.extend([LOCATION, PARENT])
 
-from constants import Constants
-from itertools import islice
-from modules.common import to_log, call_process
-from modules.common import read_isoforms_file
-from twobitreader import TwoBitFile
-
 import shutil
+from itertools import islice
+
+from constants import Constants
+from modules.common import call_process, read_isoforms_file, to_log
+from twobitreader import TwoBitFile
 
 __author__ = "Bogdan M. Kirilenko, 2024"
 __github__ = "https://github.com/kirilenkobm"
@@ -25,9 +25,12 @@ U12_AD_FIELD = {"A", "D"}
 
 class TogaSanityChecker:
     """Utility class to ensure TOGA arguments correctness."""
+
     @staticmethod
     def check_dir_args_safety(toga_cls, location):
-        protected_dirs = {os.path.abspath(x) for x in (location, toga_cls.wd, os.getcwd())}
+        protected_dirs = {
+            os.path.abspath(x) for x in (location, toga_cls.wd, os.getcwd())
+        }
         nd_dir_abspath = os.path.abspath(toga_cls.nextflow_dir)
         if nd_dir_abspath in protected_dirs:
             msg = (
@@ -168,7 +171,9 @@ class TogaSanityChecker:
         # isoforms file provided: need to check correctness and completeness
         # then check isoforms file itself
         _, isoform_to_gene, header = read_isoforms_file(isoforms_arg)
-        header_maybe_gene = header[0]  # header is optional, if not the case: first field is a gene
+        header_maybe_gene = header[
+            0
+        ]  # header is optional, if not the case: first field is a gene
         header_maybe_trans = header[1]  # and the second is the isoform
         # save filtered isoforms file here:  (without unused transcripts)
         isoforms_file = os.path.join(temp_wd, "isoforms.tsv")
@@ -212,8 +217,9 @@ class TogaSanityChecker:
     @staticmethod
     def check_chains_classified(chain_results_df):
         """Check whether chain classification result is non-empty."""
+
         def has_more_than_one_line(file_path):
-            with open(file_path, 'r') as f:
+            with open(file_path, "r") as f:
                 return sum(1 for _ in islice(f, 2)) > 1
 
         is_complete = has_more_than_one_line(chain_results_df)
@@ -249,24 +255,24 @@ class TogaSanityChecker:
 
         imports_not_found = False
         required_libraries = [
-            'twobitreader',
-            'networkx',
-            'pandas',
-            'numpy',
-            'xgboost',
-            'scikit-learn',
-            'joblib',
-            'h5py'
+            "twobitreader",
+            "networkx",
+            "pandas",
+            "numpy",
+            "xgboost",
+            "scikit-learn",
+            "joblib",
+            "h5py",
         ]
 
         to_log("# Python package versions")
         for lib in required_libraries:
             try:
                 lib_module = __import__(lib)
-                if hasattr(lib_module, '__version__'):
+                if hasattr(lib_module, "__version__"):
                     lib_version = lib_module.__version__
                 else:
-                    lib_version = 'unknown version'
+                    lib_version = "unknown version"
                 to_log(f"* {lib}: {lib_version}")
             except ImportError:
                 imports_not_found = True

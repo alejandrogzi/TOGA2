@@ -1,75 +1,68 @@
 #!/usr/bin/env python3
 
 """
-Converts pairwise FASTA file into an HDF5 storage 
+Converts pairwise FASTA file into an HDF5 storage
 """
 
 from collections import defaultdict
-from shared import CommandLineManager, CONTEXT_SETTINGS
-from numpy import bytes_
 from typing import Dict, List, Optional, TextIO
 
 import click
 import h5py
+from numpy import bytes_
+from shared import CONTEXT_SETTINGS, CommandLineManager
 
-HEADER_START: str = '>'
-REFERENCE: str = 'REFERENCE'
-REF_SOURCE: str = '_ref'
-QUERY_SOURCE: str = '_query'
-REF_EXON: str = 'reference_exon'
+HEADER_START: str = ">"
+REFERENCE: str = "REFERENCE"
+REF_SOURCE: str = "_ref"
+QUERY_SOURCE: str = "_query"
+REF_EXON: str = "reference_exon"
+
 
 @click.command(context_settings=CONTEXT_SETTINGS, no_args_is_help=True)
-@click.argument(
-    'input',
-    type=click.File('r', lazy=True),
-    metavar='INPUT_FASTA'
-)
-@click.argument(
-    'output',
-    type=click.Path(exists=False),
-    metavar='OUTPUT_HDF5'
-)
+@click.argument("input", type=click.File("r", lazy=True), metavar="INPUT_FASTA")
+@click.argument("output", type=click.Path(exists=False), metavar="OUTPUT_HDF5")
 @click.option(
-    '--exon_fasta',
-    '-e',
+    "--exon_fasta",
+    "-e",
     is_flag=True,
     default=False,
     show_default=True,
     help=(
-        'If set, expects TOGA2 exon alignment FASTA file as input. Exon number will be added '
-        'to HDF5 sequences identifiers'
-    )
+        "If set, expects TOGA2 exon alignment FASTA file as input. Exon number will be added "
+        "to HDF5 sequences identifiers"
+    ),
 )
 @click.option(
-    '--log_name',
-    '-ln',
+    "--log_name",
+    "-ln",
     type=str,
-    metavar='STR',
+    metavar="STR",
     default=None,
     show_default=True,
-    help='Logger name to use; relevant only upon main class import'
+    help="Logger name to use; relevant only upon main class import",
 )
 @click.option(
-    '--verbose',
-    '-v',
+    "--verbose",
+    "-v",
     type=bool,
     is_flag=True,
     default=False,
     show_default=True,
-    help='Controls execution verbosity'
+    help="Controls execution verbosity",
 )
-
 class FastaToHdf5Converter(CommandLineManager):
     """
-    Converts pairwise FASTA into HDF5 storage. Sequences are stored under the key of 
-    {projection_name}_{source}, where {source} is "_ref" for reference and 
+    Converts pairwise FASTA into HDF5 storage. Sequences are stored under the key of
+    {projection_name}_{source}, where {source} is "_ref" for reference and
     "_query" for query sequences, respectively.\n
-    This script is used by TOGA2 to convert pairwise protein file into HDF5 used for gene tree step 
+    This script is used by TOGA2 to convert pairwise protein file into HDF5 used for gene tree step
     input construction; it is not intended to be used outside of the TOGA2 pipeline.\n
     Arguments are:\n
     * INPUT is input pairwise FASTA file;\n
     * OUTPUT is a path to the output HDF5 storage
     """
+
     __slots__ = ()
 
     def __init__(
@@ -78,7 +71,7 @@ class FastaToHdf5Converter(CommandLineManager):
         output: click.Path,
         exon_fasta: Optional[bool],
         log_name: Optional[str],
-        verbose: Optional[bool]
+        verbose: Optional[bool],
     ) -> None:
         self.v: bool = verbose
         self.set_logging(log_name)
@@ -92,95 +85,92 @@ class FastaToHdf5Converter(CommandLineManager):
         """
         Writes pairwise protein Fasta records to HDF5, one dataset for each entry
         """
-        with h5py.File(output, 'w') as f:
-            header: str = ''
-            hdf5_id: str = ''
-            seq: str = ''
+        with h5py.File(output, "w") as f:
+            header: str = ""
+            hdf5_id: str = ""
+            seq: str = ""
             for line in input:
-                line  = line.rstrip()
+                line = line.rstrip()
                 if not line:
                     continue
                 if line[0] == HEADER_START:
                     if header:
                         try:
-                            f.create_dataset(
-                                hdf5_id, 
-                                data=bytes_(f'{header}\n{seq}')
-                            )
-                            header = ''
-                            hdf5_id = ''
-                            seq = ''
+                            f.create_dataset(hdf5_id, data=bytes_(f"{header}\n{seq}"))
+                            header = ""
+                            hdf5_id = ""
+                            seq = ""
                         except ValueError as e:
                             print(e)
                             self._die(
-                                'Sequence %s occurs twice in the input FASTA file' % hdf5_id
+                                "Sequence %s occurs twice in the input FASTA file"
+                                % hdf5_id
                             )
                     header = line
-                    header_split: List[str] = header.split(' | ')
+                    header_split: List[str] = header.split(" | ")
                     proj: str = header_split[0].lstrip(HEADER_START)
-                    source: str = REF_SOURCE if header_split[2] == REFERENCE else QUERY_SOURCE
-                    hdf5_id = f'{proj}{source}'
+                    source: str = (
+                        REF_SOURCE if header_split[2] == REFERENCE else QUERY_SOURCE
+                    )
+                    hdf5_id = f"{proj}{source}"
                 else:
                     seq += line
             if header:
-                f.create_dataset(
-                    hdf5_id, 
-                    data=bytes_(f'{header}\n{seq}')
-                )
+                f.create_dataset(hdf5_id, data=bytes_(f"{header}\n{seq}"))
 
     def write_exons_for_sleasy(self, input: TextIO, output: str) -> None:
         """
-        Writes query exons to the HDF5 file. Datasets are organized projection-wise, 
+        Writes query exons to the HDF5 file. Datasets are organized projection-wise,
         sequences are stored as ordered lists of variable-length strings
         """
         exon_seq_dict: Dict[str, List[str]] = defaultdict(list)
-        proj: str = ''
+        proj: str = ""
         exon_num: int = 0
-        seq: str = ''
+        seq: str = ""
         for line in input:
-                line  = line.rstrip()
-                if not line:
+            line = line.rstrip()
+            if not line:
+                continue
+            if line[0] == HEADER_START:
+                if proj:
+                    seq = seq.replace("-", "")
+                    if not seq:
+                        seq = "DELETED"
+                    exon_seq_dict[proj].append((exon_num, seq))
+                    # exon_seqs.append(seq)
+                    # exon_names.append(f'{proj}_{exon_num}')
+                seq = ""
+                header_split: List[str] = line.split(" | ")
+                if header_split[3] == REF_EXON:
+                    proj = ""
+                    exon_num = 0
                     continue
-                if line[0] == HEADER_START:
-                    if proj:
-                        seq = seq.replace('-','')
-                        if not seq:
-                            seq = 'DELETED'
-                        exon_seq_dict[proj].append((exon_num, seq))
-                        # exon_seqs.append(seq)
-                        # exon_names.append(f'{proj}_{exon_num}')
-                    seq = ''
-                    header_split: List[str] = line.split(' | ')
-                    if header_split[3] == REF_EXON:
-                        proj = ''
-                        exon_num = 0
-                        continue
-                    proj: str = header_split[0].lstrip(HEADER_START)
-                    exon_num: int = int(header_split[1])
-                    continue
-                if not proj:
-                    continue
-                seq += line.rstrip().replace('-','')
+                proj: str = header_split[0].lstrip(HEADER_START)
+                exon_num: int = int(header_split[1])
+                continue
+            if not proj:
+                continue
+            seq += line.rstrip().replace("-", "")
         if proj:
             exon_seq_dict[proj].append((exon_num, seq))
 
-        with h5py.File(output, 'w') as f:
+        with h5py.File(output, "w") as f:
             for projection, exons in exon_seq_dict.items():
                 sorted_exons: List[str] = [
                     bytes_(x[1]) for x in sorted(exons, key=lambda y: y[0])
                 ]
                 shape: int = len(sorted_exons)
                 f.create_dataset(
-                    projection, 
+                    projection,
                     data=sorted_exons,
                     shape=shape,
-                    compression='gzip',
-                    compression_opts=9
+                    compression="gzip",
+                    compression_opts=9,
                     # dtype=bytes_,
                     # shape=(len(header) + len(seq) + 1,),#len(header) + len(seq) + 1,
                     # chunks=True
                 )
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     FastaToHdf5Converter()

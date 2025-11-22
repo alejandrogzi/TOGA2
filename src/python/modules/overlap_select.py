@@ -3,8 +3,10 @@
 For a chain and a set of genes returns the following:
 gene: how many bases this chain overlap in exons.
 """
+
 from collections import defaultdict
 from typing import Dict, List, Tuple
+
 # from version import __version__
 
 __author__ = "Bogdan Kirilenko, 2020."
@@ -46,7 +48,7 @@ def chain_reader(chain):
     del chain_data[0]  # keep blocks only in the chain_data list
     # define starting point
     progress = int(chain_head[5])
-    query_strand: bool = chain_head[9] == '+'
+    query_strand: bool = chain_head[9] == "+"
     if query_strand:
         query_progress: int = int(chain_head[10])
     else:
@@ -61,8 +63,12 @@ def chain_reader(chain):
             block_start = progress
             block_end = block_start + block_size
             query_block_start: int = query_progress
-            query_block_end: int = query_block_start + (block_size if query_strand else - block_size)#block_size
-            query_block_start, query_block_end = sorted((query_block_start, query_block_end))
+            query_block_end: int = query_block_start + (
+                block_size if query_strand else -block_size
+            )  # block_size
+            query_block_start, query_block_end = sorted(
+                (query_block_start, query_block_end)
+            )
             yield block_start, block_end, query_block_start, query_block_end
             break  # end the loop
 
@@ -74,9 +80,13 @@ def chain_reader(chain):
         progress = block_end + dt
         dq: int = int(block_info[2])
         query_block_start: int = query_progress
-        query_block_end: int = query_block_start + (block_size if query_strand else -block_size)#block_size
-        query_progress = query_block_end + (dq if query_strand else - dq)#dq
-        query_block_start, query_block_end = sorted((query_block_start, query_block_end))
+        query_block_end: int = query_block_start + (
+            block_size if query_strand else -block_size
+        )  # block_size
+        query_progress = query_block_end + (dq if query_strand else -dq)  # dq
+        query_block_start, query_block_end = sorted(
+            (query_block_start, query_block_end)
+        )
         yield block_start, block_end, query_block_start, query_block_end
 
 
@@ -88,14 +98,15 @@ def intersect(ch_block, be_block):
 def gene2strand_dict(bed: str) -> Dict[str, bool]:
     """Creates a sequence:strand dictionary"""
     out_dict: Dict[str, str] = {}
-    for line in bed.split('\n'):
-        data: List[str] = line.split('\t')
+    for line in bed.split("\n"):
+        data: List[str] = line.split("\t")
         if not data or not data[0]:
             continue
         name: str = data[3]
         strand: str = data[5]
-        out_dict[name] = strand == '+'
+        out_dict[name] = strand == "+"
     return out_dict
+
 
 def overlap_select(bed, chain):
     """Python implementation of some overlapSelect (kent) functionality."""
@@ -111,8 +122,8 @@ def overlap_select(bed, chain):
     chain_len = 0  # sum of chain blocks
     start_with = 0  # bed tracks counter
 
-    chain_header: List[str] = chain.split('\n')[0].split(' ')
-    query_strand: bool = chain_header[9] == '+'
+    chain_header: List[str] = chain.split("\n")[0].split(" ")
+    query_strand: bool = chain_header[9] == "+"
     # t_start: int = int(chain_header[5])
     # t_end: int = int(chain_header[6])
     # t_strand: bool = chain_header[4] == '+'
@@ -166,7 +177,7 @@ def overlap_select(bed, chain):
                 # add the intersection size
                 bed_overlaps[exon[2]] += block_vs_exon
                 bed_covered_times[exon[2]].add(exon[0])
-                if exon[2].endswith('_chainclip'):
+                if exon[2].endswith("_chainclip"):
                     if first_cds_block is None:
                         first_cds_block = block
                         first_cds_exon = exon
@@ -191,7 +202,7 @@ def overlap_select(bed, chain):
     if first_cds_block is not None:
         cds_start_offset: int = first_cds_exon[0] - first_cds_block[0]
         cds_end_offset: int = last_cds_block[1] - last_cds_exon[1]
-        if query_strand:#gene2strand[first_cds_exon[2]] == query_strand:
+        if query_strand:  # gene2strand[first_cds_exon[2]] == query_strand:
             cds_start_in_query: int = first_cds_block[2] + cds_start_offset
             cds_end_in_query: int = last_cds_block[3] - cds_end_offset
         else:
@@ -206,14 +217,20 @@ def overlap_select(bed, chain):
         # print(f'{cds_start_in_query=}, {cds_end_in_query=}')
         query_coding_len: int = abs(cds_end_in_query - cds_start_in_query)
         covered_cds_range: Tuple[int, int] = (
-            max(first_cds_exon[0], first_cds_block[0]), 
-            min(last_cds_exon[1], last_cds_block[1])
+            max(first_cds_exon[0], first_cds_block[0]),
+            min(last_cds_exon[1], last_cds_block[1]),
         )
     else:
         query_coding_len: int = 0
         covered_cds_range: int = (0, 0)
     # return the required values
-    return chain_len, bed_overlaps, bed_covered_times, query_coding_len, covered_cds_range
+    return (
+        chain_len,
+        bed_overlaps,
+        bed_covered_times,
+        query_coding_len,
+        covered_cds_range,
+    )
 
 
 # def get_coding_boundaries_in_query(
@@ -237,4 +254,4 @@ def overlap_select(bed, chain):
 #         [x[0] for x in cds_ranges]
 #     )
 #     cds_end: int = max([x[1] for x in cds_ranges])
-#     for x in 
+#     for x in

@@ -5,65 +5,60 @@ Aggregates the results from the initial (graph-based) and fine (tree-based)
 orthology resolution steps
 """
 
-from .constants import Headers
+import os
+import sys
 from collections import defaultdict
-from .shared import (
-    base_proj_name, CommandLineManager, CONTEXT_SETTINGS
-)
-
 from typing import Dict, List, Optional, Set, TextIO, Tuple, Union
 
 import click
-import os
-import sys
+
+from .constants import Headers
+from .shared import CONTEXT_SETTINGS, CommandLineManager, base_proj_name
 
 LOCATION: str = os.path.dirname(os.path.abspath(__file__))
 PARENT: str = os.sep.join(LOCATION.split(os.sep)[:-1])
 sys.path.extend([LOCATION, PARENT])
 
-__author__ = 'Yury V. Malovichko'
-__year__ = '2024'
-__credits__ = ('Amy Stephen', 'Michael Hiller',  'Bogdan M. Kirilenko')
-__all__ = (None)
+__author__ = "Yury V. Malovichko"
+__year__ = "2024"
+__credits__ = ("Amy Stephen", "Michael Hiller", "Bogdan M. Kirilenko")
+__all__ = None
 
 Q_PREFIX: str = "#Q#"
 R_PREFIX: str = "#R#"
 # ABS_EDGE_THRESHOLD: float = 0.75
 # REL_EDGE_THRESHOLD: float = 0.9
-ONE2ZERO: str = 'one2zero'
-ONE2ONE: str = 'one2one'
-ONE2MANY: str = 'one2many'
-MANY2ONE: str = 'many2one'
-MANY2MANY: str = 'many2many'
-ORTH_REJ_TEMPLATE: str = 'TRANSCRIPT\t{}\t0\tRejected after the gene resolution step\tGENE_TREE_REJECTION\t{}'
+ONE2ZERO: str = "one2zero"
+ONE2ONE: str = "one2one"
+ONE2MANY: str = "one2many"
+MANY2ONE: str = "many2one"
+MANY2MANY: str = "many2many"
+ORTH_REJ_TEMPLATE: str = "TRANSCRIPT\t{}\t0\tRejected after the gene resolution step\tGENE_TREE_REJECTION\t{}"
+
 
 def restore_fragmented_proj_id(proj: str) -> str:
     """
     Restores commas in the fragmented projection names replaced with underscores by RAxML
     """
-    components: List[str] = proj.split('#')
+    components: List[str] = proj.split("#")
     chain_id: str = components[-1]
     if chain_id.isdigit():
         return proj
-    if '_' in chain_id and ',' not in chain_id:
-        chain_id = chain_id.replace('_', ',')
+    if "_" in chain_id and "," not in chain_id:
+        chain_id = chain_id.replace("_", ",")
         components[-1] = chain_id
-        return '#'.join(components)
+        return "#".join(components)
     else:
         return proj
 
 
 def get_tr(proj: str) -> str:
     """Strips the projection name of the chain identifier(s) and returns the progenitor transcript's name"""
-    return '#'.join(base_proj_name(proj).split('#')[:-1])
+    return "#".join(base_proj_name(proj).split("#")[:-1])
 
 
 @click.command(context_settings=CONTEXT_SETTINGS, no_args_is_help=True)
-@click.argument(
-    'init_results',
-    type=click.File('r'),
-    metavar='INIT_ORTH_RESULTS'
-)
+@click.argument("init_results", type=click.File("r"), metavar="INIT_ORTH_RESULTS")
 # @click.argument(
 #     'ref_genes',
 #     type=click.File('r'),
@@ -74,90 +69,99 @@ def get_tr(proj: str) -> str:
 #     type=click.File('r'),
 #     metavar='QUERY_GENES'
 # )
-@click.argument(
-    'resolved_leaves',
-    type=click.File('r'),
-    metavar='RESOLVED_LEAVES'
-)
+@click.argument("resolved_leaves", type=click.File("r"), metavar="RESOLVED_LEAVES")
 @click.option(
-    '--output',
-    '-o',
-    type=click.File('w', lazy=True),
-    metavar='OUTPUT_FILE',
+    "--output",
+    "-o",
+    type=click.File("w", lazy=True),
+    metavar="OUTPUT_FILE",
     default=sys.stdout,
     show_default=False,
-    help='A path to write the updated orthology data to [default: stdout]'
+    help="A path to write the updated orthology data to [default: stdout]",
 )
 @click.option(
-    '--one2zero_file',
-    '-o2z',
-    type=click.File('w', lazy=True),
-    metavar='ONE2ZERO_FILE',
+    "--one2zero_file",
+    "-o2z",
+    type=click.File("w", lazy=True),
+    metavar="ONE2ZERO_FILE",
     default=None,
     show_default=True,
-    help='A path to write the genes rendered 1:0 after the tree reconciliation step'
+    help="A path to write the genes rendered 1:0 after the tree reconciliation step",
 )
 @click.option(
-    '--rejection_log',
-    type=click.File('a', lazy=True),
-    metavar='REJECTION_LOG',
+    "--rejection_log",
+    type=click.File("a", lazy=True),
+    metavar="REJECTION_LOG",
     default=None,
     show_default=True,
-    help='A path to write the rejection report to'
+    help="A path to write the rejection report to",
 )
 @click.option(
-    '--rejected_list',
-    type=click.File('w', lazy=True),
-    metavar='REJECTED_TRANSCRPIPT',
+    "--rejected_list",
+    type=click.File("w", lazy=True),
+    metavar="REJECTED_TRANSCRPIPT",
     default=None,
     show_default=True,
-    help='A path to write rejected projections\' names to'
+    help="A path to write rejected projections' names to",
 )
 @click.option(
-    '--loss_summary',
-    type=click.File('r', lazy=True),
-    metavar='LOSS_SUMMARY_FILE',
+    "--loss_summary",
+    type=click.File("r", lazy=True),
+    metavar="LOSS_SUMMARY_FILE",
     default=None,
     show_default=True,
     help=(
-        'TOGA-produced conservation/loss summary file. If provided, loss statuses '
-        'from the file will be used in the rejected items report'
-    )
+        "TOGA-produced conservation/loss summary file. If provided, loss statuses "
+        "from the file will be used in the rejected items report"
+    ),
 )
 @click.option(
-    '--log_file',
-    '-l',
+    "--log_file",
+    "-l",
     type=click.Path(exists=False),
-    metavar='FILE',
+    metavar="FILE",
     default=None,
-    help='A file to write the execution progress log to'
+    help="A file to write the execution progress log to",
 )
 @click.option(
-    '--log_name',
-    '-ln',
+    "--log_name",
+    "-ln",
     type=str,
-    metavar='STR',
+    metavar="STR",
     default=None,
     show_default=True,
-    help='Logger name to use; relevant only upon main class import'
+    help="Logger name to use; relevant only upon main class import",
 )
 @click.option(
-    '--verbose',
-    '-v',
-    metavar='FLAG',
+    "--verbose",
+    "-v",
+    metavar="FLAG",
     is_flag=True,
     default=False,
     show_default=True,
-    help='Controls the execution verbosity'
+    help="Controls the execution verbosity",
 )
-
 class FinalOrthologyResolver(CommandLineManager):
     __slots__ = (
-        'ref_gene2tr', 'ref_tr2gene', 'query_gene2tr', 'query_tr2gene',
-        'tr2proj', 'proj2tr', 'r2q', 'q2r', 'removed_genes', 'one2zero_genes', 
-        'rejected_items', 'rejection_log', 'rejected_list',
-        'loss_file', 'proj2loss',
-        'out_lines', 'output', 'one2zero_file', 'log_file'
+        "ref_gene2tr",
+        "ref_tr2gene",
+        "query_gene2tr",
+        "query_tr2gene",
+        "tr2proj",
+        "proj2tr",
+        "r2q",
+        "q2r",
+        "removed_genes",
+        "one2zero_genes",
+        "rejected_items",
+        "rejection_log",
+        "rejected_list",
+        "loss_file",
+        "proj2loss",
+        "out_lines",
+        "output",
+        "one2zero_file",
+        "log_file",
     )
 
     def __init__(
@@ -169,17 +173,19 @@ class FinalOrthologyResolver(CommandLineManager):
         output: Optional[click.File],
         one2zero_file: Optional[Union[click.File, None]],
         rejection_log: Optional[Union[click.File, None]],
-        rejected_list: Optional[Union[click.File, None]],   
+        rejected_list: Optional[Union[click.File, None]],
         loss_summary: Optional[Union[click.File, None]],
         log_file: Optional[click.Path],
         log_name: Optional[str],
-        verbose: Optional[bool]
+        verbose: Optional[bool],
     ) -> None:
         self.v: bool = verbose
         self.log_file: click.Path = log_file
         self.set_logging(log_name)
 
-        self.ref_gene2tr: Dict[str, List[str]] = defaultdict(list) ## TODO: Redundant???
+        self.ref_gene2tr: Dict[str, List[str]] = defaultdict(
+            list
+        )  ## TODO: Redundant???
         self.ref_tr2gene: Dict[str, str] = {}
         self.query_gene2tr: Dict[str, List[str]] = defaultdict(list)
         self.query_tr2gene: Dict[str, str] = {}
@@ -188,8 +194,10 @@ class FinalOrthologyResolver(CommandLineManager):
         self.proj2tr: Dict[str, List[str]] = defaultdict(list)
         self.r2q: Dict[str, Set[str]] = defaultdict(set)
         self.q2r: Dict[str, Set[str]] = defaultdict(set)
-        self.removed_genes: Set[str] = set() ## genes fully resolved by gene trees
-        self.one2zero_genes: List[str] = [] ## genes rendered one2zero after gene tree reconciliation
+        self.removed_genes: Set[str] = set()  ## genes fully resolved by gene trees
+        self.one2zero_genes: List[
+            str
+        ] = []  ## genes rendered one2zero after gene tree reconciliation
         self.out_lines: List[str] = []
         self.one2zero_file: Union[click.File, None] = one2zero_file
         self.rejected_items: List[str] = []
@@ -215,9 +223,9 @@ class FinalOrthologyResolver(CommandLineManager):
             line = line.strip()
             if not line:
                 continue
-            data: List[str] = line.split('\t')
+            data: List[str] = line.split("\t")
             if len(data) != 2:
-                self._die('ERROR: Isoform file provided is improperly formatted')
+                self._die("ERROR: Isoform file provided is improperly formatted")
             gene: str = data[0]
             tr: str = data[1]
             if is_ref:
@@ -244,7 +252,7 @@ class FinalOrthologyResolver(CommandLineManager):
             line = line.rstrip()
             if not line:
                 continue
-            data: List[str] = line.split('\t')
+            data: List[str] = line.split("\t")
             ## TODO: Sanity check for column number
             if data[-1] != MANY2MANY:
                 self.out_lines.append(line)
@@ -262,23 +270,24 @@ class FinalOrthologyResolver(CommandLineManager):
 
     def parse_loss_summary(self) -> None:
         """
-        If loss summary files was provided, 
+        If loss summary files was provided,
         extracts query projection loss statuses
         """
         if self.loss_file is None:
             return
         for i, line in enumerate(self.loss_file):
-            data: List[str] = line.rstrip().split('\t')
+            data: List[str] = line.rstrip().split("\t")
             if not data:
                 continue
             if len(data) != 3:
                 self._die(
                     (
-                        'Wrong data format encountered in the loss summary file at line %i; '
-                        'expected 3 fields, got %i'
-                    ) % (i + 1, len(data))
+                        "Wrong data format encountered in the loss summary file at line %i; "
+                        "expected 3 fields, got %i"
+                    )
+                    % (i + 1, len(data))
                 )
-            if data[0] != 'PROJECTION':
+            if data[0] != "PROJECTION":
                 continue
             self.proj2loss[data[1]] = data[2]
 
@@ -292,40 +301,44 @@ class FinalOrthologyResolver(CommandLineManager):
             line = line.rstrip()
             if not line:
                 continue
-            data: List[str] = line.split('\t')
+            data: List[str] = line.split("\t")
             if not data or not data[0]:
                 continue
-            if data[0] == 'reference':
+            if data[0] == "reference":
                 continue
             ## TODO: Sanity check for column number
             try:
-                ref_tr: str = next(
-                    x for x in data if R_PREFIX in x
-                ).replace(R_PREFIX, '')
+                ref_tr: str = next(x for x in data if R_PREFIX in x).replace(
+                    R_PREFIX, ""
+                )
             except StopIteration:
                 ref_tr: str = data[0]
             try:
-                query_tr: str = next(
-                    x for x in data if Q_PREFIX in x
-                ).replace(Q_PREFIX, '')
+                query_tr: str = next(x for x in data if Q_PREFIX in x).replace(
+                    Q_PREFIX, ""
+                )
             except StopIteration:
                 query_tr: str = data[1]
             query_tr = restore_fragmented_proj_id(query_tr)
-            ref_tr = '#'.join(ref_tr.split('#')[:-1])
+            ref_tr = "#".join(ref_tr.split("#")[:-1])
             ref_gene: str = self.ref_tr2gene[ref_tr]
             query_gene: str = self.query_tr2gene[query_tr]
-            ### CURRENT IDEA: First, check whether all the query genes 
+            ### CURRENT IDEA: First, check whether all the query genes
             ### actually have projections from the reference orthologs
             ### does not seem trivial since the input does not contain any indications of the original clique
-            if query_gene not in self.r2q[ref_gene] and ref_gene not in self.q2r[query_gene]:
+            if (
+                query_gene not in self.r2q[ref_gene]
+                and ref_gene not in self.q2r[query_gene]
+            ):
                 self._to_log(
-                    'Ortholog pair resolved in the gene tree has no connection in the original graph: %s and %s' % (ref_tr, query_tr),
-                    'warning'
+                    "Ortholog pair resolved in the gene tree has no connection in the original graph: %s and %s"
+                    % (ref_tr, query_tr),
+                    "warning",
                 )
                 clique: List[str] = self._restore_original_clique(ref_gene)
                 deprecated_cliques = deprecated_cliques.union(clique)
             transcript_pairs[(ref_gene, query_gene)].append((ref_tr, query_tr))
-        
+
         for (ref_gene, query_gene), transcripts in transcript_pairs.items():
             if ref_gene in deprecated_cliques or query_gene in deprecated_cliques:
                 continue
@@ -345,23 +358,28 @@ class FinalOrthologyResolver(CommandLineManager):
             self.removed_genes.add(ref_gene)
             self.removed_genes.add(query_gene)
             for ref_tr, query_tr in transcripts:
-                ## CAVEAT: Query transcript used  for gene tree reconstruction 
+                ## CAVEAT: Query transcript used  for gene tree reconstruction
                 ## might have come from a gene other than the newly established ortholog;
-                ## pick the one used for the tree reconstruction only if the established 
+                ## pick the one used for the tree reconstruction only if the established
                 ## ortholog has no projection in the query gene
-                v = ref_tr == 'XM_047425712.1#OTUD7B'
+                v = ref_tr == "XM_047425712.1#OTUD7B"
                 if v:
-                    print(f'{ref_tr=}, {query_tr=}')
+                    print(f"{ref_tr=}, {query_tr=}")
                 progenitor_tr: str = get_tr(query_tr)
                 if progenitor_tr not in self.ref_tr2gene:
-                    self._die('Transcript %s is missing from the reference gene-to-transcript mapping' % progenitor_tr)
+                    self._die(
+                        "Transcript %s is missing from the reference gene-to-transcript mapping"
+                        % progenitor_tr
+                    )
                 progenitor_gene: str = self.ref_tr2gene[progenitor_tr]
                 if progenitor_gene != ref_gene:
                     self._to_log(
                         (
-                            'Projection %s was used for gene tree reconstruction according to which the actual '
-                            'ortholog of %s is %s; looking for representative transcripts in the original graph'
-                        ) % (query_tr, query_gene, ref_gene), 'warning'
+                            "Projection %s was used for gene tree reconstruction according to which the actual "
+                            "ortholog of %s is %s; looking for representative transcripts in the original graph"
+                        )
+                        % (query_tr, query_gene, ref_gene),
+                        "warning",
                     )
                     recorded_lines: bool = False
                 else:
@@ -371,15 +389,21 @@ class FinalOrthologyResolver(CommandLineManager):
                     # self.out_lines.append(out_line)
                     recorded_lines: bool = True
                 for other_query_tr in self.query_gene2tr[query_gene]:
-                    other_ref_tr: str = get_tr(other_query_tr)#'#'.join(other_query_tr.split('#')[:-1])
+                    other_ref_tr: str = get_tr(
+                        other_query_tr
+                    )  #'#'.join(other_query_tr.split('#')[:-1])
                     if v:
-                        print(f'{other_ref_tr=}, {other_query_tr=}, {ref_gene=}, {self.ref_tr2gene[other_ref_tr]=}')
+                        print(
+                            f"{other_ref_tr=}, {other_query_tr=}, {ref_gene=}, {self.ref_tr2gene[other_ref_tr]=}"
+                        )
                     ## projections from other genes are counted as rejected
                     if self.ref_tr2gene[other_ref_tr] != ref_gene:
-                        self._to_log(f'Skipping {other_query_tr} since it does not belong to the original reference gene')
+                        self._to_log(
+                            f"Skipping {other_query_tr} since it does not belong to the original reference gene"
+                        )
                         self.rejected_items.append(other_query_tr)
                         continue
-                    out_line: str = '\t'.join(
+                    out_line: str = "\t".join(
                         (ref_gene, other_ref_tr, query_gene, other_query_tr, ONE2ONE)
                     )
                     self.out_lines.append(out_line)
@@ -387,9 +411,10 @@ class FinalOrthologyResolver(CommandLineManager):
                 if not recorded_lines:
                     self._die(
                         (
-                            'No transcripts from gene %s were projected to query locus %s; '
-                            'transcript %s will be used for query gene annotation instead'
-                        ) % (ref_gene, query_gene, query_tr)
+                            "No transcripts from gene %s were projected to query locus %s; "
+                            "transcript %s will be used for query gene annotation instead"
+                        )
+                        % (ref_gene, query_gene, query_tr)
                     )
                     # self._to_log(
                     #     (
@@ -414,53 +439,58 @@ class FinalOrthologyResolver(CommandLineManager):
             ## sanity check
             if ref_gene in self.removed_genes:
                 continue
-            query_genes = {
-                x for x in query_genes if x not in self.removed_genes
-            }
+            query_genes = {x for x in query_genes if x not in self.removed_genes}
             ref_genes: Set[str] = {
-                x for q in query_genes for x in self.q2r[q]
+                x
+                for q in query_genes
+                for x in self.q2r[q]
                 if x not in self.removed_genes
             }
             ref_gene_num: int = len(ref_genes)
             other_query_genes: Set[str] = {
-                x for r in ref_genes for x in self.r2q[r]
-                if x not in self.removed_genes
+                x for r in ref_genes for x in self.r2q[r] if x not in self.removed_genes
             }
             query_gene_num: int = len(other_query_genes)
             # if any(not x for x in (ref_gene_num, query_gene_num)):
             if not query_gene_num:
                 self._to_log(
-                    'Reference gene %s was reduced to ONE2ZERO after the tree-based resolution step' % ref_gene,
-                    'warning'
+                    "Reference gene %s was reduced to ONE2ZERO after the tree-based resolution step"
+                    % ref_gene,
+                    "warning",
                 )
-                self.one2zero_genes.append(ref_gene) if ref_gene not in self.one2zero_genes else None
+                self.one2zero_genes.append(
+                    ref_gene
+                ) if ref_gene not in self.one2zero_genes else None
                 for ref_tr in self.ref_gene2tr[ref_gene]:
-                    out_line: str = '\t'.join(
-                            (ref_gene, ref_tr, 'None', 'None', ONE2ZERO)
-                        )
+                    out_line: str = "\t".join(
+                        (ref_gene, ref_tr, "None", "None", ONE2ZERO)
+                    )
                     self.out_lines.append(out_line)
             # if any(not x for x in (ref_gene_num, query_gene_num)):
             # if not ref_gene_num:
             #     self._die(
             #         'ERROR: Certain clades were reduced to ONE2ONE but missing '
-            #         'from the resolved pairs file: %s|%s' % (ref_gene, ','.join(query_genes)) 
+            #         'from the resolved pairs file: %s|%s' % (ref_gene, ','.join(query_genes))
             #     )
             status: str = (
-                ONE2MANY if ref_gene_num == 1 else 
-                MANY2ONE if query_gene_num == 1 else 
-                ONE2ZERO if not query_gene_num else 
-                MANY2MANY
+                ONE2MANY
+                if ref_gene_num == 1
+                else MANY2ONE
+                if query_gene_num == 1
+                else ONE2ZERO
+                if not query_gene_num
+                else MANY2MANY
             )
             for query_gene in query_genes:
                 query_trs: List[str] = self.query_gene2tr[query_gene]
                 for query_tr in query_trs:
-                    ref_tr: str = '#'.join(query_tr.split('#')[:-1])
+                    ref_tr: str = "#".join(query_tr.split("#")[:-1])
                     if self.ref_tr2gene[ref_tr] != ref_gene:
                         continue
                     if status == ONE2ZERO:
-                        query_gene = 'None'
-                        query_tr = 'None'
-                    out_line: str = '\t'.join(
+                        query_gene = "None"
+                        query_tr = "None"
+                    out_line: str = "\t".join(
                         (ref_gene, ref_tr, query_gene, query_tr, status)
                     )
                     self.out_lines.append(out_line)
@@ -471,18 +501,18 @@ class FinalOrthologyResolver(CommandLineManager):
         """
         self.output.write(Headers.ORTHOLOGY_TABLE_HEADER)
         for line in self.out_lines:
-            self.output.write(line + '\n')
+            self.output.write(line + "\n")
         if self.one2zero_file is not None and self.one2zero_genes:
             for gene in self.one2zero_genes:
-                self.one2zero_file.write(gene + '\n')
+                self.one2zero_file.write(gene + "\n")
         if self.rejected_items:
             for item in self.rejected_items:
                 if self.rejected_list is not None:
-                    self.rejected_list.write(item + '\n')
+                    self.rejected_list.write(item + "\n")
                 if self.rejection_log is not None:
-                    loss_status: str = self.proj2loss.get(item, 'N')
+                    loss_status: str = self.proj2loss.get(item, "N")
                     rej_line: str = ORTH_REJ_TEMPLATE.format(item, loss_status)
-                    self.rejection_log.write(rej_line + '\n')
+                    self.rejection_log.write(rej_line + "\n")
 
     def _restore_original_clique(self, start: str) -> List[str]:
         """
@@ -499,12 +529,15 @@ class FinalOrthologyResolver(CommandLineManager):
             elif node in self.q2r:
                 neighbours: List[str] = self.q2r[node]
             else:
-                self._die('Gene %s not found in either reference or query gene list', node)
+                self._die(
+                    "Gene %s not found in either reference or query gene list", node
+                )
             for neighbour in neighbours:
                 if neighbour in visited:
                     continue
                 queue.append(neighbour)
         return visited
 
-if __name__ == '__main__':
+
+if __name__ == "__main__":
     FinalOrthologyResolver()

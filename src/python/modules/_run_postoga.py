@@ -111,7 +111,10 @@ def run(args: argparse.Namespace) -> None:
             print(f"INFO: moving {file}")
 
             if file.endswith("gtf.gz"):
-                shutil.move(os.path.join(postoga_dir, file), os.path.join(query_dir, "query_annotation.gtf.gz"))
+                shutil.move(
+                    os.path.join(postoga_dir, file),
+                    os.path.join(query_dir, "query_annotation.gtf.gz"),
+                )
             else:
                 shutil.move(os.path.join(postoga_dir, file), query_dir)
 

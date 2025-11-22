@@ -4,14 +4,10 @@
 SpliceAI prediction wrapper
 """
 
-from .constants import Constants
-from .parallel_jobs_manager import (
-    CustomStrategy, NextflowStrategy, 
-    ParaStrategy, ParallelJobsManager
-)
-from .shared import CommandLineManager, dir_name_by_date, get_upper_dir
+import os
 from collections import defaultdict
 from heapq import heappop, heappush
+
 # from parallel_jobs_manager import (
 #     CustomStrategy, NextflowStrategy,
 #     ParaStrategy, ParallelJobsManager
@@ -19,44 +15,75 @@ from heapq import heappop, heappush
 from typing import Dict, List, Optional, Tuple, Union
 
 import click
-import os
+
+from .constants import Constants
+from .parallel_jobs_manager import (
+    CustomStrategy,
+    NextflowStrategy,
+    ParallelJobsManager,
+    ParaStrategy,
+)
+from .shared import CommandLineManager, dir_name_by_date, get_upper_dir
 
 PYTHON_DIR: str = get_upper_dir(__file__, 2)
-EXEC_SCRIPT: str = os.path.join(PYTHON_DIR, 'predict_with_spliceai.py')
-CONTIG_SIZE_SCRIPT: str = os.path.join(PYTHON_DIR, 'get_contig_sizes.py')
+EXEC_SCRIPT: str = os.path.join(PYTHON_DIR, "predict_with_spliceai.py")
+CONTIG_SIZE_SCRIPT: str = os.path.join(PYTHON_DIR, "get_contig_sizes.py")
 
 DEFAULT_CHUNK_SIZE: int = 6_000_000
 DEFAULT_FLANK_SIZE: int = 50_000
 DEFAULT_MIN_CONTIG_SIZE: int = 500
 DEFAULT_MEMORY_LIMIT: int = 5
 
-STRANDS: Tuple[str, str] = ('+', '-')
+STRANDS: Tuple[str, str] = ("+", "-")
 
 FILE_NAME_TEMPLATES: Tuple[str] = (
-    'AcceptorPlus', 'AcceptorMinus',
-    'DonorPlus', 'DonorMinus'
+    "AcceptorPlus",
+    "AcceptorMinus",
+    "DonorPlus",
+    "DonorMinus",
 )
 
-DONOR_PLUS: str = 'spliceAiDonorPlus.bw'
-DONOR_MINUS: str = 'spliceAiDonorMinus'
-ACC_PLUS: str = 'spliceAiAcceptorPlus'
-ACC_MINUS: str = 'spliceAiAcceptorMinus'
+DONOR_PLUS: str = "spliceAiDonorPlus.bw"
+DONOR_MINUS: str = "spliceAiDonorMinus"
+ACC_PLUS: str = "spliceAiAcceptorPlus"
+ACC_MINUS: str = "spliceAiAcceptorMinus"
+
 
 class SpliceAiManager(CommandLineManager):
-    """
-    """
+    """ """
+
     __slots__ = (
-        'output', 'tmp_dir', 'nextflow_dir',
-        'twobit', 'chunk_size', 'flank_size',
-        'min_contig_size', 'round_to', 'min_prob',
-        'project_name', 'job_num', 'parallel_strategy',
-        'nextflow_exec_script', 'max_number_of_retries', 
-        'nextflow_config_file', 'max_parallel_time', 
-        'cluster_queue_name', 'memory_limit',
-        'bed_dir', 'job_file', 'job_list', 'chunk_num',
-        'tmp_fa', 'unmasked_twobit', 'chrom_sizes',
-        'twobittofa_binary', 'fatotwobit_binary', 'wigtobigwig_binary',
-        'v', 'log_file', 'keep_tmp'
+        "output",
+        "tmp_dir",
+        "nextflow_dir",
+        "twobit",
+        "chunk_size",
+        "flank_size",
+        "min_contig_size",
+        "round_to",
+        "min_prob",
+        "project_name",
+        "job_num",
+        "parallel_strategy",
+        "nextflow_exec_script",
+        "max_number_of_retries",
+        "nextflow_config_file",
+        "max_parallel_time",
+        "cluster_queue_name",
+        "memory_limit",
+        "bed_dir",
+        "job_file",
+        "job_list",
+        "chunk_num",
+        "tmp_fa",
+        "unmasked_twobit",
+        "chrom_sizes",
+        "twobittofa_binary",
+        "fatotwobit_binary",
+        "wigtobigwig_binary",
+        "v",
+        "log_file",
+        "keep_tmp",
     )
 
     def __init__(
@@ -80,18 +107,19 @@ class SpliceAiManager(CommandLineManager):
         fatotwobit_binary: Optional[click.Path],
         wigtobigwig_binary: Optional[click.Path],
         keep_temporary_files: Optional[bool],
-        verbose: Optional[bool]
+        verbose: Optional[bool],
     ) -> None:
         self.v: bool = verbose
-        self.project_name: str = dir_name_by_date('spliceai')
+        self.project_name: str = dir_name_by_date("spliceai")
         self.output: str = (
-            self._abspath(output) if output is not None else 
-            self._abspath(self.project_name)
+            self._abspath(output)
+            if output is not None
+            else self._abspath(self.project_name)
         )
         self._mkdir(self.output)
-        self.tmp_dir: str = os.path.join(self.output, f'tmp_{self.project_name}')
-        self.nextflow_dir: str = os.path.join(self.tmp_dir, 'nextflow')
-        self.log_file: str = os.path.join(self.output, f'{self.project_name}.txt')
+        self.tmp_dir: str = os.path.join(self.output, f"tmp_{self.project_name}")
+        self.nextflow_dir: str = os.path.join(self.tmp_dir, "nextflow")
+        self.log_file: str = os.path.join(self.output, f"{self.project_name}.txt")
         self.set_logging()
         self.logger.propagate = False
 
@@ -102,10 +130,11 @@ class SpliceAiManager(CommandLineManager):
         if self.flank_size > self.chunk_size:
             self._to_log(
                 (
-                    'Chunk flank cannot be greater than chunk size; '
-                    'setting chunk flank to %i'
-                ) % self.chunk_size,
-                'warning'
+                    "Chunk flank cannot be greater than chunk size; "
+                    "setting chunk flank to %i"
+                )
+                % self.chunk_size,
+                "warning",
             )
             self.flank_size = self.chunk_size
         self.min_contig_size: int = min_contig_size
@@ -123,11 +152,11 @@ class SpliceAiManager(CommandLineManager):
         self.memory_limit: int = memory_limit
         self.chunk_num: int = 0
 
-        self.bed_dir: str = os.path.join(self.tmp_dir, 'bed_input')
-        self.job_list: str = os.path.join(self.tmp_dir, 'joblist')
-        self.tmp_fa: str = os.path.join(self.tmp_dir, 'unmasked.fa')
-        self.unmasked_twobit: str = os.path.join(self.tmp_dir, 'unmasked.2bit')
-        self.chrom_sizes: str = os.path.join(self.tmp_dir, 'chrom_sizes.txt')
+        self.bed_dir: str = os.path.join(self.tmp_dir, "bed_input")
+        self.job_list: str = os.path.join(self.tmp_dir, "joblist")
+        self.tmp_fa: str = os.path.join(self.tmp_dir, "unmasked.fa")
+        self.unmasked_twobit: str = os.path.join(self.tmp_dir, "unmasked.2bit")
+        self.chrom_sizes: str = os.path.join(self.tmp_dir, "chrom_sizes.txt")
 
         self.twobittofa_binary: Union[str, None] = twobittofa_binary
         self.fatotwobit_binary: Union[str, None] = fatotwobit_binary
@@ -153,56 +182,53 @@ class SpliceAiManager(CommandLineManager):
 
     def prepare_ref_genome(self) -> None:
         """
-        Replaces assembly gaps with polyA in the input genome 
+        Replaces assembly gaps with polyA in the input genome
         since SpliceAi cannot process symbols other than A/C/G/T
 
         As in-place 2bit file modification is impossible, the original file
-        is first decompressed, with non-standard nucleotide symbols 
+        is first decompressed, with non-standard nucleotide symbols
         in the sequence part then being removed
 
         In the same run, the code extract contig sizes from the resulting Fasta file
         """
         ## unmask the genome
-        self._to_log(
-            'Replacing ambiguous symbols with adenosines in the genome file'
-        )
+        self._to_log("Replacing ambiguous symbols with adenosines in the genome file")
         unmask_cmd: str = (
-            'set -eu; set -o pipefail; '
-            f'{self.twobittofa_binary} {self.twobit} stdout | '
-            f'sed \'/^>/!s/[BD-FH-SU-Z]/A/Ig\' | tee {self.tmp_fa} |'
-            f'{CONTIG_SIZE_SCRIPT} - -o {self.chrom_sizes}'
+            "set -eu; set -o pipefail; "
+            f"{self.twobittofa_binary} {self.twobit} stdout | "
+            f"sed '/^>/!s/[BD-FH-SU-Z]/A/Ig' | tee {self.tmp_fa} |"
+            f"{CONTIG_SIZE_SCRIPT} - -o {self.chrom_sizes}"
         )
-        _ = self._exec(unmask_cmd, 'Genome unmasking & contig size retrieval failed:')
+        _ = self._exec(unmask_cmd, "Genome unmasking & contig size retrieval failed:")
         ## convert the resulting fasta back into 2bit
-        self._to_log(
-            'Compressing the modified genome sequence'
-        )
+        self._to_log("Compressing the modified genome sequence")
         compress_cmd: str = (
-            f'{self.fatotwobit_binary} {self.tmp_fa} {self.unmasked_twobit}'
+            f"{self.fatotwobit_binary} {self.tmp_fa} {self.unmasked_twobit}"
         )
-        _ = self._exec(compress_cmd, 'faToTwoBit compression failed:')
-        
+        _ = self._exec(compress_cmd, "faToTwoBit compression failed:")
+
     def schedule_jobs(self) -> None:
         """
-        Schedules SpliceAI jobs for cluster execution. 
-        Individual commands are grouped in {self.n_jobs} job bins. Jobs are equilibrated 
-        using longest-processing-time-first (LPT) algorithm with sequence lengths 
+        Schedules SpliceAI jobs for cluster execution.
+        Individual commands are grouped in {self.n_jobs} job bins. Jobs are equilibrated
+        using longest-processing-time-first (LPT) algorithm with sequence lengths
         as proxies for execution time per command
         """
         bin2chunks: Dict[str, List[Tuple[str, int, int, str]]] = defaultdict(list)
         job_heap: List[Tuple[int, int]] = [(0, i) for i in range(self.job_num)]
         chunk_num: int = 0
-        with open(self.chrom_sizes, 'r') as h:
+        with open(self.chrom_sizes, "r") as h:
             for i, line in enumerate(h, start=1):
-                data: List[str] = line.strip().split('\t')
+                data: List[str] = line.strip().split("\t")
                 if not data:
                     continue
                 if len(data) != 2:
                     self._die(
                         (
-                            'Improper formatting in the chromosome size file at line %s; '
-                            'expected 2 columns, got % i'
-                        ) % (i, len(data))
+                            "Improper formatting in the chromosome size file at line %s; "
+                            "expected 2 columns, got % i"
+                        )
+                        % (i, len(data))
                     )
                 contig, length = data
                 length = int(length)
@@ -214,7 +240,7 @@ class SpliceAiManager(CommandLineManager):
                     ## longer sequences are split into individual chunks
                     chunk_num: int = length // self.chunk_size
                     for s in range(0, chunk_num):
-                    # for s in range(0, length, self.chunk_size):
+                        # for s in range(0, length, self.chunk_size):
                         start: int = s * self.chunk_size
                         flanked_start: int = max(0, start - self.flank_size)
                         end: int = min(length, start + self.chunk_size)
@@ -223,18 +249,28 @@ class SpliceAiManager(CommandLineManager):
                         lightest_bin: Tuple[int, int] = heappop(job_heap)
                         total_bin_size, bin_id = lightest_bin
                         # name: str = f'{contig}:{start}-{end}'
-                        name: str = f'chunk{chunk_num}'
+                        name: str = f"chunk{chunk_num}"
                         bin2chunks[bin_id].append(
-                            '\t'.join(
-                                map(str, (
-                                    contig, flanked_start, flanked_end, name + '{}', 0, '{}', start, end
-                                ))
+                            "\t".join(
+                                map(
+                                    str,
+                                    (
+                                        contig,
+                                        flanked_start,
+                                        flanked_end,
+                                        name + "{}",
+                                        0,
+                                        "{}",
+                                        start,
+                                        end,
+                                    ),
+                                )
                             )
                         )
                         total_bin_size += chunk_size
                         heappush(job_heap, (total_bin_size, bin_id))
-                        chunk_num +=1
-                    ## if there is a trailing terminal portion, 
+                        chunk_num += 1
+                    ## if there is a trailing terminal portion,
                     ## flank it from the left side and push it as well
                     if self.chunk_size * chunk_num < length:
                         start: int = chunk_num * self.chunk_size
@@ -245,12 +281,22 @@ class SpliceAiManager(CommandLineManager):
                         total_bin_size, bin_id = lightest_bin
                         # name: str = f'{contig}:{flanked_start}-{end}'
                         # bin2chunks[bin_id].append((contig, start, end))
-                        name: str = f'chunk{chunk_num}'
+                        name: str = f"chunk{chunk_num}"
                         bin2chunks[bin_id].append(
-                            '\t'.join(
-                                map(str, (
-                                    contig, flanked_start, flanked_end, name + '{}', 0, '{}', start, end
-                                ))
+                            "\t".join(
+                                map(
+                                    str,
+                                    (
+                                        contig,
+                                        flanked_start,
+                                        flanked_end,
+                                        name + "{}",
+                                        0,
+                                        "{}",
+                                        start,
+                                        end,
+                                    ),
+                                )
                             )
                         )
                         total_bin_size += chunk_size
@@ -264,10 +310,13 @@ class SpliceAiManager(CommandLineManager):
                     # bin2chunks[bin_id].append(
                     #     (contig, 0, length, name)
                     # )
-                    name: str = f'chunk{chunk_num}'
+                    name: str = f"chunk{chunk_num}"
                     bin2chunks[bin_id].append(
-                        '\t'.join(
-                            map(str, (contig, 0, length, name + '{}', 0, '{}', 0, length))
+                        "\t".join(
+                            map(
+                                str,
+                                (contig, 0, length, name + "{}", 0, "{}", 0, length),
+                            )
                         )
                     )
                     total_bin_size += length
@@ -281,8 +330,8 @@ class SpliceAiManager(CommandLineManager):
         for bucket, intervals in bin2chunks.items():
             if not intervals:
                 continue
-            bed_file: str = os.path.join(self.bed_dir, f'batch{self.chunk_num}.bed')
-            with open(bed_file, 'w') as h:
+            bed_file: str = os.path.join(self.bed_dir, f"batch{self.chunk_num}.bed")
+            with open(bed_file, "w") as h:
                 for interval in intervals:
                     ## record each chunk twice, once for each strand
                     for strand in STRANDS:
@@ -292,19 +341,19 @@ class SpliceAiManager(CommandLineManager):
                         # )
                         # line: str = '\t'.join(map(str, upd_interval))
                         line: str = interval.format(strand, strand)
-                        h.write(line + '\n')
+                        h.write(line + "\n")
             ## add the resulting command to the job list
             cmd: str = (
-                f'{EXEC_SCRIPT} {self.unmasked_twobit} {bed_file} '
-                f'--round_to {self.round_to} --min_prob {self.min_prob} -o {self.tmp_dir} '
-                f'--twobittofa_binary {self.twobittofa_binary} '
-                f'--wigtobigwig_binary {self.wigtobigwig_binary}'
+                f"{EXEC_SCRIPT} {self.unmasked_twobit} {bed_file} "
+                f"--round_to {self.round_to} --min_prob {self.min_prob} -o {self.tmp_dir} "
+                f"--twobittofa_binary {self.twobittofa_binary} "
+                f"--wigtobigwig_binary {self.wigtobigwig_binary}"
             )
             job_list.append(cmd)
             self.chunk_num += 1
-        with open(self.job_list, 'w') as h:
+        with open(self.job_list, "w") as h:
             for job in job_list:
-                h.write(job + '\n')
+                h.write(job + "\n")
 
     def run_jobs(self) -> None:
         """
@@ -313,72 +362,73 @@ class SpliceAiManager(CommandLineManager):
         simplified for the needs of the SpliceAI annotaiton mode.
         """
         ## get parallel process manager based on the requested strategy
-        if self.parallel_strategy == 'para':
+        if self.parallel_strategy == "para":
             strategy = ParaStrategy()
-        elif self.parallel_strategy == 'custom':
+        elif self.parallel_strategy == "custom":
             strategy = CustomStrategy()
         else:
             strategy = NextflowStrategy()
         job_manager: ParallelJobsManager = ParallelJobsManager(strategy)
-        local_executor: bool = self.parallel_strategy == 'local'
+        local_executor: bool = self.parallel_strategy == "local"
 
         ## generate Nextflow configuration fil
         if self.nextflow_config_file is None:
-            nf_contents: str = Constants.NEXTFLOW_STUB.format(self.max_number_of_retries)
-            nf_file: str = os.path.join(self.nextflow_dir, 'execute_joblist.nf')
+            nf_contents: str = Constants.NEXTFLOW_STUB.format(
+                self.max_number_of_retries
+            )
+            nf_file: str = os.path.join(self.nextflow_dir, "execute_joblist.nf")
             self.nextflow_exec_script = nf_file
-            with open(nf_file, 'w') as h:
-                h.write(nf_contents + '\n')
+            with open(nf_file, "w") as h:
+                h.write(nf_contents + "\n")
 
         project_name: str = self.project_name
         project_path: str = os.path.join(self.nextflow_dir, project_name)
         manager_data: Dict[str, str] = {
-            'project_name': project_name,
-            'project_path': project_path,
-            'logs_dir': project_path,
-            'nextflow_dir': self.nextflow_dir,
-            'NF_EXECUTE': self.nextflow_exec_script,
-            'local_executor': local_executor,
-            'keep_nf_logs': self.keep_tmp,
+            "project_name": project_name,
+            "project_path": project_path,
+            "logs_dir": project_path,
+            "nextflow_dir": self.nextflow_dir,
+            "NF_EXECUTE": self.nextflow_exec_script,
+            "local_executor": local_executor,
+            "keep_nf_logs": self.keep_tmp,
             # 'nexflow_config_file': nextflow_config,
-            'nextflow_config_dir': self.nextflow_dir,
-            'temp_wd': self.tmp_dir,
-            'queue_name': self.cluster_queue_name,
-            'logger': self.logger
+            "nextflow_config_dir": self.nextflow_dir,
+            "temp_wd": self.tmp_dir,
+            "queue_name": self.cluster_queue_name,
+            "logger": self.logger,
         }
         if self.nextflow_config_file is not None:
-            manager_data['nexflow_config_file'] = self.nextflow_config_file
+            manager_data["nexflow_config_file"] = self.nextflow_config_file
         try:
             job_manager.execute_jobs(
                 self.job_list,
                 manager_data,
                 project_name,
                 wait=True,
-                memory_limit=self.memory_limit, ## TODO: Potentially should be set to custom values 
+                memory_limit=self.memory_limit,  ## TODO: Potentially should be set to custom values
                 queue_name=self.cluster_queue_name,
                 clean=self.keep_tmp,
                 cpu=1,
                 process_num=self.chunk_num + 1,
-                executor=self.parallel_strategy
+                executor=self.parallel_strategy,
             )
         except KeyboardInterrupt:
             # TogaUtil.terminate_parallel_processes([job_manager])
-            self._to_log('Aborting the parallel step', 'warning')
+            self._to_log("Aborting the parallel step", "warning")
             job_manager.terminate_process()
-        
+
     def aggregate_jobs(self) -> None:
         """
         Aggregates individual job results and converts them into into bigWig format,
         one per each splice site and each strand
         """
-        self._to_log('Aggregating SpliceAI prediction results')
+        self._to_log("Aggregating SpliceAI prediction results")
         for template in FILE_NAME_TEMPLATES:
-            final_file: str = os.path.join(self.output, f'spliceAi{template}.bw')
-            stub_path: str = os.path.join(self.tmp_dir, f'*{template}.wig')
-            tmp_aggr_wig: str = os.path.join(self.tmp_dir, f'spliceAi{template}.wig')
+            final_file: str = os.path.join(self.output, f"spliceAi{template}.bw")
+            stub_path: str = os.path.join(self.tmp_dir, f"*{template}.wig")
+            tmp_aggr_wig: str = os.path.join(self.tmp_dir, f"spliceAi{template}.wig")
             cmd: str = (
-                f'cat {stub_path} > {tmp_aggr_wig} && '
-                f'{self.wigtobigwig_binary} {tmp_aggr_wig} {self.chrom_sizes} {final_file}'
+                f"cat {stub_path} > {tmp_aggr_wig} && "
+                f"{self.wigtobigwig_binary} {tmp_aggr_wig} {self.chrom_sizes} {final_file}"
             )
-            _ = self._exec(cmd, 'File aggregation for %s failed:' % template)
-
+            _ = self._exec(cmd, "File aggregation for %s failed:" % template)

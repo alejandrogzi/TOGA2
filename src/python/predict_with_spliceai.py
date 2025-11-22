@@ -1,134 +1,129 @@
 #!/usr/bin/env python3
 
 """
-Atomic script for query genome SpliceAI annotation; 
-invoked in parallel with `toga2.py spliceai command` 
+Atomic script for query genome SpliceAI annotation;
+invoked in parallel with `toga2.py spliceai command`
 """
 
-from modules.spliceai_manager import STRANDS
-from modules.shared import (
-    CONTEXT_SETTINGS, CommandLineManager, 
-    dir_name_by_date, hex_code
-)
-from typing import (
-    Dict, Iterable, List, Optional, Tuple, Union
-)
+import os
+from typing import Dict, Iterable, List, Optional, Tuple, Union
 
 import click
-import os
+from modules.shared import (
+    CONTEXT_SETTINGS,
+    CommandLineManager,
+    dir_name_by_date,
+    hex_code,
+)
+from modules.spliceai_manager import STRANDS
 
-__author__ = 'Yury V. Malovichko'
-__credits__ = ('Michael Hiller', 'Lucas Koch')
-__year__ = '2025'
+__author__ = "Yury V. Malovichko"
+__credits__ = ("Michael Hiller", "Lucas Koch")
+__year__ = "2025"
 
-FASTA_HEADER_START: str = '>'
-WIGGLE_HEADER_TEMPLATE: str = 'fixedStep chrom={} start={} step=1 span=1\n'
+FASTA_HEADER_START: str = ">"
+WIGGLE_HEADER_TEMPLATE: str = "fixedStep chrom={} start={} step=1 span=1\n"
+
 
 @click.command(context_settings=CONTEXT_SETTINGS, no_args_is_help=True)
-@click.argument(
-    'twobit', 
-    type=click.Path(exists=True),
-    metavar='QUERY_2BIT'
-)
-@click.argument(
-    'bed_file',
-    type=click.Path(exists=True),
-    metavar='BED_FILE'
-)
+@click.argument("twobit", type=click.Path(exists=True), metavar="QUERY_2BIT")
+@click.argument("bed_file", type=click.Path(exists=True), metavar="BED_FILE")
 @click.option(
-    '--round_to',
+    "--round_to",
     type=click.IntRange(min=1),
-    metavar='INT',
+    metavar="INT",
     default=4,
     show_default=True,
-    help=(
-        'Number of decimal digits to round SpliceAI predicted probabilities to'
-    )
+    help=("Number of decimal digits to round SpliceAI predicted probabilities to"),
 )
 @click.option(
-    '--min_prob',
+    "--min_prob",
     type=click.FloatRange(min=0.0, max=1.0),
-    metavar='FLOAT',
-    default=.001,
+    metavar="FLOAT",
+    default=0.001,
     show_default=True,
     help=(
-        'Minimal SpliceAI-predicted probability to consider. Values lower than this '
-        'will not be reported in the output bigWig files'
-    )
+        "Minimal SpliceAI-predicted probability to consider. Values lower than this "
+        "will not be reported in the output bigWig files"
+    ),
 )
 @click.option(
-    '--twobittofa_binary',
+    "--twobittofa_binary",
     type=click.Path(exists=True),
-    metavar='PATH',
+    metavar="PATH",
     default=None,
     show_default=False,
     help=(
-        'A path to twoBitToFa binary. If not provided, the binary will be sought for in $PATH'
-    )
+        "A path to twoBitToFa binary. If not provided, the binary will be sought for in $PATH"
+    ),
 )
 @click.option(
-    '--wigtobigwig_binary',
+    "--wigtobigwig_binary",
     type=click.Path(exists=True),
-    metavar='PATH',
+    metavar="PATH",
     default=None,
     show_default=False,
     help=(
-        'A path to wigToBigWig binary. If not provided, the binary will be sought for in $PATH'
-    )
+        "A path to wigToBigWig binary. If not provided, the binary will be sought for in $PATH"
+    ),
 )
 @click.option(
-    '--output',
-    '-o',
+    "--output",
+    "-o",
     type=click.Path(exists=False),
-    metavar='PATH',
+    metavar="PATH",
     default=None,
     show_default=True,
-    help='A path to directory to write the results to'
+    help="A path to directory to write the results to",
 )
 @click.option(
-    '--log_file',
+    "--log_file",
     type=click.Path(exists=False),
-    metavar='PATH',
+    metavar="PATH",
     default=None,
     show_default=True,
-    help='A path to the file to record the execution log in'
+    help="A path to the file to record the execution log in",
 )
-@click.option(
-    '--verbose'
-)
-
+@click.option("--verbose")
 class SpliceAiRunner(CommandLineManager):
     """
-    Atomic SpliceAI prediction script: Given a genome assembly in 2bit format 
-    and a Bed file of genome intervals, predicts splice site locations in each intervals 
+    Atomic SpliceAI prediction script: Given a genome assembly in 2bit format
+    and a Bed file of genome intervals, predicts splice site locations in each intervals
     with SpliceAI.\n
-    NOTE: This script is intended to be used by TOGA2 SpliceAI annotation command (`toga2.py spliceai`). 
+    NOTE: This script is intended to be used by TOGA2 SpliceAI annotation command (`toga2.py spliceai`).
     Running this script outside of the standard procedure is highly discouraged.\n
 
     Mandatory arguments are:\n
     \t* QUERY_2BIT is a path to genome assembly in 2bit format. Note that:\n
-    \t\t* TOGA2 uses SpliceAI predictions for QUERY assembly; you do not have to annotate the assembly 
+    \t\t* TOGA2 uses SpliceAI predictions for QUERY assembly; you do not have to annotate the assembly
     you are going to use as reference;\n
-    \t\t* SpliceAI cannot process symbols other than the standard nucleotide alphabet (A/C/G/T). 
-    TOGA2 SpliceAI annotation command (`toga2.py spliceai`) replaces all non-standard nucleotide symbols 
-    in the 2bit file with adenosine nucleotides (A). If you are running this script manually outside of the 
-    TOGA2 procedure, you have to take care of symbol masking yourself. WARNING: Removing non-standard symbols 
+    \t\t* SpliceAI cannot process symbols other than the standard nucleotide alphabet (A/C/G/T).
+    TOGA2 SpliceAI annotation command (`toga2.py spliceai`) replaces all non-standard nucleotide symbols
+    in the 2bit file with adenosine nucleotides (A). If you are running this script manually outside of the
+    TOGA2 procedure, you have to take care of symbol masking yourself. WARNING: Removing non-standard symbols
     without replacement will distort reported coordinates and is therefore discouraged.\n
-    \t* BED_FILE is a Bed4-8 file containing genome coordinates for genomic sequences to extract from QUERY_2BIT 
+    \t* BED_FILE is a Bed4-8 file containing genome coordinates for genomic sequences to extract from QUERY_2BIT
     and further annotate with SpliceAI.\n
-    \t\t* Input files generated by the standard procedure are guaranteed to comply with Bed6 format. If you are 
-    running this script manually, adding strand data (Bed column 6) is highly recommended, 
+    \t\t* Input files generated by the standard procedure are guaranteed to comply with Bed6 format. If you are
+    running this script manually, adding strand data (Bed column 6) is highly recommended,
     otherwise only positive strand predictions will be reported;\n
     """
 
     __slots__ = (
-        'twobit', 'bed_file',
-        'round_to', 'min_prob',
-        'chunk2coords', 'chunk2offsets',
-        'acc_plus_file', 'do_plus_file',
-        'acc_minus_file', 'do_minus_file',
-        'twobittofa_binary', 'wigtobigwig_binary',
-        'log_file', 'v'
+        "twobit",
+        "bed_file",
+        "round_to",
+        "min_prob",
+        "chunk2coords",
+        "chunk2offsets",
+        "acc_plus_file",
+        "do_plus_file",
+        "acc_minus_file",
+        "do_minus_file",
+        "twobittofa_binary",
+        "wigtobigwig_binary",
+        "log_file",
+        "v",
     )
 
     def __init__(
@@ -141,11 +136,11 @@ class SpliceAiRunner(CommandLineManager):
         wigtobigwig_binary: Optional[Union[click.Path, None]] = None,
         output: Optional[click.Path] = None,
         log_file: Optional[click.Path] = None,
-        verbose: Optional[bool] = False
+        verbose: Optional[bool] = False,
     ) -> None:
         self.v: bool = verbose
         self.log_file: Union[click.Path, None] = log_file
-        output: str = output if output is not None else dir_name_by_date('spliceai_job')
+        output: str = output if output is not None else dir_name_by_date("spliceai_job")
         self._mkdir(output)
 
         self.set_logging()
@@ -154,11 +149,13 @@ class SpliceAiRunner(CommandLineManager):
         self.bed_file: click.Path = bed_file
         self.round_to: int = round_to
         self.min_prob: float = min_prob
-        
-        self.acc_plus_file: str = os.path.join(output, f'{hex_code()}AcceptorPlus.wig')
-        self.do_plus_file: str = os.path.join(output, f'{hex_code()}DonorPlus.wig')
-        self.acc_minus_file: str = os.path.join(output, f'{hex_code()}AcceptorMinus.wig')
-        self.do_minus_file: str = os.path.join(output, f'{hex_code()}DonorMinus.wig')
+
+        self.acc_plus_file: str = os.path.join(output, f"{hex_code()}AcceptorPlus.wig")
+        self.do_plus_file: str = os.path.join(output, f"{hex_code()}DonorPlus.wig")
+        self.acc_minus_file: str = os.path.join(
+            output, f"{hex_code()}AcceptorMinus.wig"
+        )
+        self.do_minus_file: str = os.path.join(output, f"{hex_code()}DonorMinus.wig")
 
         self.twobittofa_binary: Union[str, None] = twobittofa_binary
         self.wigtobigwig_binary: Union[str, None] = wigtobigwig_binary
@@ -180,28 +177,28 @@ class SpliceAiRunner(CommandLineManager):
         a) locate original chunk within each input sequence, setting the overlapping flanks aside;
         b) properly assess the coordinates in the final Bed file
         """
-        self._to_log('Extracting sequences from the genome 2bit file')
-        with open(self.bed_file, 'r') as h:
+        self._to_log("Extracting sequences from the genome 2bit file")
+        with open(self.bed_file, "r") as h:
             for i, line in enumerate(h, start=1):
-                data: List[str] = line.strip().split('\t')
+                data: List[str] = line.strip().split("\t")
                 if not data:
                     continue
                 if len(data) < 4:
                     self._die(
                         (
-                            'Improper input Bed file formatting: '
-                            'expected at least 4 columns, got %i'
-                        ) % i
+                            "Improper input Bed file formatting: "
+                            "expected at least 4 columns, got %i"
+                        )
+                        % i
                     )
                 chrom: str = data[0]
                 flank_start: int = int(data[1])
                 flank_end: int = int(data[2])
                 name: str = data[3]
-                if len(data) >6 and data[5] not in STRANDS:
+                if len(data) > 6 and data[5] not in STRANDS:
                     self._die(
-                        (
-                            'Illegal strand value at the input Bed file line %i: %s'
-                        ) % (i, data[5])
+                        ("Illegal strand value at the input Bed file line %i: %s")
+                        % (i, data[5])
                     )
                 if len(data) >= 8:
                     chunk_start: int = int(data[6])
@@ -218,35 +215,37 @@ class SpliceAiRunner(CommandLineManager):
         """
         Extracts sequences from the original Bed file, runs SpliceAI for each of them
         """
-        self._to_log('Starting SpliceAI prediction step')
+        self._to_log("Starting SpliceAI prediction step")
         ## extract the sequences from the twobit file with the twoBitToFa command
-        cmd: str = f'{self.twobittofa_binary} -bed={self.bed_file} {self.twobit} stdout'
-        output: Union[str, None] = self._exec(cmd, 'twoBitToFa call failed:')
+        cmd: str = f"{self.twobittofa_binary} -bed={self.bed_file} {self.twobit} stdout"
+        output: Union[str, None] = self._exec(cmd, "twoBitToFa call failed:")
 
         ## lazy imports start here
+        import numpy as np
         from keras.models import load_model
         from pkg_resources import resource_filename
         from spliceai.utils import one_hot_encode
-        import numpy as np
 
         # this code was provided by the SpliceAI authors
-        ## import the models and 
-        self._to_log('Loading SpliceAI models')
+        ## import the models and
+        self._to_log("Loading SpliceAI models")
         context: int = 10000
-        paths: Iterable[str] = ('models/spliceai{}.h5'.format(x) for x in range(1, 6))
-        models = [load_model(resource_filename('spliceai', x)) for x in paths]
-        self._to_log('Finished loading model')
+        paths: Iterable[str] = ("models/spliceai{}.h5".format(x) for x in range(1, 6))
+        models = [load_model(resource_filename("spliceai", x)) for x in paths]
+        self._to_log("Finished loading model")
 
         ## start parsing the output fasta;
-        ## for each item, run SpliceAI prediction procedure, 
+        ## for each item, run SpliceAI prediction procedure,
         ## then write the results to output files
-        header: str = ''
-        seq: str = ''
+        header: str = ""
+        seq: str = ""
         with (
-            open(self.acc_plus_file, 'w') as aph, open(self.do_plus_file, 'w') as dph,
-            open(self.acc_minus_file, 'w') as amh, open(self.do_minus_file, 'w') as dmh
+            open(self.acc_plus_file, "w") as aph,
+            open(self.do_plus_file, "w") as dph,
+            open(self.acc_minus_file, "w") as amh,
+            open(self.do_minus_file, "w") as dmh,
         ):
-            for line in output.split('\n'):
+            for line in output.split("\n"):
                 line = line.strip()
                 if line.startswith(FASTA_HEADER_START):
                     ## next header reached; run SpliceAI for the sequence
@@ -254,13 +253,16 @@ class SpliceAiRunner(CommandLineManager):
                         ## get the sequence coordinates in the original genome
                         if header[-1] not in STRANDS:
                             self._die(
-                                'Sequence %s does not have indication of its strand in the Fasta header' % header
+                                "Sequence %s does not have indication of its strand in the Fasta header"
+                                % header
                             )
                         seq = seq.upper()
-                        strand: bool = header[-1] == '+'
+                        strand: bool = header[-1] == "+"
                         chrom, start, end = self.chunk2coords[header]
                         start_offset, end_offset = self.chunk2offsets[header]
-                        x = one_hot_encode('N' * (context // 2) + seq + 'N' * (context // 2))[None, :]
+                        x = one_hot_encode(
+                            "N" * (context // 2) + seq + "N" * (context // 2)
+                        )[None, :]
                         y = np.mean([models[m].predict(x) for m in range(5)], axis=0)
 
                         ## get probabilities for acceptor and donor sites
@@ -269,7 +271,9 @@ class SpliceAiRunner(CommandLineManager):
                         start_index: int = start_offset
                         end_index: int = len(seq) - end_offset
                         ## write the headers to the Wiggle files
-                        wiggle_header: str = WIGGLE_HEADER_TEMPLATE.format(chrom, start + 1)
+                        wiggle_header: str = WIGGLE_HEADER_TEMPLATE.format(
+                            chrom, start + 1
+                        )
                         if strand:
                             aph.write(wiggle_header)
                             dph.write(wiggle_header)
@@ -331,18 +335,18 @@ class SpliceAiRunner(CommandLineManager):
                         for i, x in enumerate(donor_prob):
                             x = round(x, self.round_to) if x >= self.min_prob else 0.0
                             if strand:
-                                dph.write(str(x) + '\n')
+                                dph.write(str(x) + "\n")
                             else:
-                                dmh.write(str(x) + '\n')
+                                dmh.write(str(x) + "\n")
                         for i, x in enumerate(acceptor_prob):
                             x = round(x, self.round_to) if x >= self.min_prob else 0.0
                             if strand:
-                                aph.write(str(x) + '\n')
+                                aph.write(str(x) + "\n")
                             else:
-                                amh.write(str(x) + '\n')
+                                amh.write(str(x) + "\n")
 
                     ## start recording the new Fasta entry
-                    seq = ''
+                    seq = ""
                     header = line[1:]
                     continue
                 if not line:
@@ -354,12 +358,15 @@ class SpliceAiRunner(CommandLineManager):
             if header and seq:
                 if header[-1] not in STRANDS:
                     self._die(
-                        'Sequence %s does not have indication of its strand in the Fasta header' % header
+                        "Sequence %s does not have indication of its strand in the Fasta header"
+                        % header
                     )
-                strand: bool = header[-1] == '+'
+                strand: bool = header[-1] == "+"
                 chrom, start, end = self.chunk2coords[header]
                 start_offset, end_offset = self.chunk2offsets[header]
-                x = one_hot_encode('N' * (context // 2) + seq + 'N' * (context // 2))[None, :]
+                x = one_hot_encode("N" * (context // 2) + seq + "N" * (context // 2))[
+                    None, :
+                ]
                 y = np.mean([models[m].predict(x) for m in range(5)], axis=0)
                 ## get probabilities for acceptor and donor sites
                 # positional probabilities
@@ -419,18 +426,18 @@ class SpliceAiRunner(CommandLineManager):
                 for i, x in enumerate(donor_prob):
                     x = round(x, self.round_to) if x >= self.min_prob else 0.0
                     if strand:
-                        dph.write(str(x) + '\n')
+                        dph.write(str(x) + "\n")
                     else:
-                        dmh.write(str(x) + '\n')
+                        dmh.write(str(x) + "\n")
 
                 ## write the results to the Wiggle output file
                 for i, x in enumerate(acceptor_prob):
                     x = round(x, self.round_to) if x >= self.min_prob else 0.0
                     if strand:
-                        aph.write(str(x) + '\n')
+                        aph.write(str(x) + "\n")
                     else:
-                        amh.write(str(x) + '\n')
+                        amh.write(str(x) + "\n")
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     SpliceAiRunner()

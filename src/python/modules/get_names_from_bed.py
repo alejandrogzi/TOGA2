@@ -2,7 +2,9 @@
 """Just extract names from toga output bed file.
 
 Works like xenoRefGenelx.pl"""
+
 import sys
+
 # from version import __version__
 
 if len(sys.argv) != 2:

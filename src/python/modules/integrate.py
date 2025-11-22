@@ -1,39 +1,43 @@
 #!/usr/bin/env python3
 
 """
-Integrates TOGA2 results obtained with multiple references for a single query 
+Integrates TOGA2 results obtained with multiple references for a single query
 to produce a combined, multi-reference TOGA2 annotation
 """
-
-from .cesar_wrapper_constants import CLASS_TO_COL, CLASS_TO_NUM
-from .constants import Constants
-from collections import defaultdict
-from dataclasses import dataclass
-from .shared import (
-    CommandLineManager, base_proj_name, 
-    get_proj2trans, get_upper_dir, intersection
-)
-from shutil import which
-from typing import Dict, Iterable, List, Optional, Set, TextIO, Union
 
 import gzip
 import json
 import os
+from collections import defaultdict
+from dataclasses import dataclass
+from shutil import which
+from typing import Dict, Iterable, List, Optional, Set, TextIO, Union
+
 import networkx as nx
 
-TOGA2_ROOT: str = get_upper_dir(__file__, 4)
-BIN: str = os.path.join(TOGA2_ROOT, 'bin')
-DEFAULT_BIGBED2BED: str = os.path.join(BIN, 'bigBedToBed')
-LOCATION: str = os.path.dirname(os.path.abspath(__file__))
-MAKE_IX_SCRIPT: str = os.path.join(LOCATION, 'get_names_from_bed.py')
+from .cesar_wrapper_constants import CLASS_TO_COL, CLASS_TO_NUM
+from .constants import Constants
+from .shared import (
+    CommandLineManager,
+    base_proj_name,
+    get_proj2trans,
+    get_upper_dir,
+    intersection,
+)
 
-ALL: str = 'ALL'
+TOGA2_ROOT: str = get_upper_dir(__file__, 4)
+BIN: str = os.path.join(TOGA2_ROOT, "bin")
+DEFAULT_BIGBED2BED: str = os.path.join(BIN, "bigBedToBed")
+LOCATION: str = os.path.dirname(os.path.abspath(__file__))
+MAKE_IX_SCRIPT: str = os.path.join(LOCATION, "get_names_from_bed.py")
+
+ALL: str = "ALL"
 BED_FIELD_NUM: int = 12
-COL2CLASS: Dict[str, str] = {y:x for x,y in CLASS_TO_COL.items()}
-EXON_HEADER: str = 'projection'
-INTACT_EXON: str = 'I'
-SUPPORTED: str = 'CHAIN_SUPPORTED'
-PLUS: str = '+'
+COL2CLASS: Dict[str, str] = {y: x for x, y in CLASS_TO_COL.items()}
+EXON_HEADER: str = "projection"
+INTACT_EXON: str = "I"
+SUPPORTED: str = "CHAIN_SUPPORTED"
+PLUS: str = "+"
 
 ## check the NetworkX version
 nx_v: str = nx.__version__
@@ -43,42 +47,59 @@ if len(v_split) > 1:
 else:
     NX_VERSION: float = float(v_split[0])
 
-class ReferenceBundle: ## initialized from a JSON object
+
+class ReferenceBundle:  ## initialized from a JSON object
     """
-    Data class for reference- and query annotation data 
+    Data class for reference- and query annotation data
     bound to a certain TOGA2 reference
     """
+
     __slots__ = (
-        'query_bed', 'exon_meta', 'ref_isoforms',
-        'paralogs', 'ppgenes', 'ucsc_bigbed',
-        'protein_file', 'nucleotide_file',
-        'priority'
+        "query_bed",
+        "exon_meta",
+        "ref_isoforms",
+        "paralogs",
+        "ppgenes",
+        "ucsc_bigbed",
+        "protein_file",
+        "nucleotide_file",
+        "priority",
     )
+
     def __init__(
-        self, 
+        self,
         kwargs: Dict[str, Union[str, os.PathLike, int]],
-        priority: Optional[int] = None
+        priority: Optional[int] = None,
     ) -> None:
-        self.query_bed: str = kwargs['query_bed']
-        self.exon_meta: str = kwargs['exon_meta']
-        self.ref_isoforms: Union[str, None] = kwargs.get('reference_isoforms', None)
-        self.paralogs: Union[str, None] = kwargs.get('paralog_list', None)
-        self.ppgenes: Union[str, None] = kwargs.get('processed_pseudogene_list', None)
-        self.ucsc_bigbed: Union[str, None] = kwargs.get('ucsc_bigbed', None)
-        self.protein_file: Union[str, None] = kwargs.get('protein_file', None)
-        self.nucleotide_file: Union[str, None] = kwargs.get('nucleotide_file', None)
-        self.priority: int = kwargs.get('priority', priority)
+        self.query_bed: str = kwargs["query_bed"]
+        self.exon_meta: str = kwargs["exon_meta"]
+        self.ref_isoforms: Union[str, None] = kwargs.get("reference_isoforms", None)
+        self.paralogs: Union[str, None] = kwargs.get("paralog_list", None)
+        self.ppgenes: Union[str, None] = kwargs.get("processed_pseudogene_list", None)
+        self.ucsc_bigbed: Union[str, None] = kwargs.get("ucsc_bigbed", None)
+        self.protein_file: Union[str, None] = kwargs.get("protein_file", None)
+        self.nucleotide_file: Union[str, None] = kwargs.get("nucleotide_file", None)
+        self.priority: int = kwargs.get("priority", priority)
+
 
 @dataclass
 class BedRecord:
     """
     Data class containing data for a single BED file record
     """
+
     __slots__ = (
-        'name', 'ref', 'chrom', 'start', 'end', 
-        'strand', 'loss_status', 'lines', 'exons'
+        "name",
+        "ref",
+        "chrom",
+        "start",
+        "end",
+        "strand",
+        "loss_status",
+        "lines",
+        "exons",
     )
-    
+
     def __init__(
         self,
         name: str,
@@ -88,7 +109,7 @@ class BedRecord:
         end: int,
         strand: bool,
         loss_status: str,
-        lines: List[str]
+        lines: List[str],
     ) -> None:
         self.name: str = name
         self.ref: str = ref
@@ -100,19 +121,19 @@ class BedRecord:
         self.lines: List[str] = lines
         self.exons: List[str] = []
 
-    def return_bed_line(self, prefix: Union[str] = '') -> Iterable[str]:
+    def return_bed_line(self, prefix: Union[str] = "") -> Iterable[str]:
         """Returns the initial BED line for the projection"""
         for line in self.lines:
-            yield line.format(f'{prefix}.{self.name}', CLASS_TO_COL[self.loss_status])
+            yield line.format(f"{prefix}.{self.name}", CLASS_TO_COL[self.loss_status])
+
 
 @dataclass
 class ExonRecord:
     """Exon coordinate record"""
+
     ## TODO: Salvage a similar class from preprocessing code
-    __slots__ = (
-        'projection', 'num', 'chrom', 'start', 'end', 'strand'
-    )
-    
+    __slots__ = ("projection", "num", "chrom", "start", "end", "strand")
+
     projection: str
     num: int
     chrom: str
@@ -123,18 +144,37 @@ class ExonRecord:
 
 class AnnotationIntegrator(CommandLineManager):
     __slots__ = (
-        'ref_data', 'query_projections', 'query_proj2ref',
-        'query_annotation', 'ref_proj2gene',
-        'paralog_pool', 'ppgene_pool',
-        'graph', 'discarded_items', 'final_projections', 
-        'accepted_statuses',
-        'output', 'gene_tsv', 'gene_bed', 'projection_bed',
-        'protein_file', 'nucleotide_file',
-        'ucsc_dir', 'bigbed_stub', 'bigbed', 'ix', 'ixx',
-        'prefix', 'skip_ucsc', 'has_ucsc_data', 
-        'bigbedtobed_binary', 'bedtobigbed_binary',
-        'ixixx_binary', 'schema', 'chrom_sizes',
-        'bed_index'
+        "ref_data",
+        "query_projections",
+        "query_proj2ref",
+        "query_annotation",
+        "ref_proj2gene",
+        "paralog_pool",
+        "ppgene_pool",
+        "graph",
+        "discarded_items",
+        "final_projections",
+        "accepted_statuses",
+        "output",
+        "gene_tsv",
+        "gene_bed",
+        "projection_bed",
+        "protein_file",
+        "nucleotide_file",
+        "ucsc_dir",
+        "bigbed_stub",
+        "bigbed",
+        "ix",
+        "ixx",
+        "prefix",
+        "skip_ucsc",
+        "has_ucsc_data",
+        "bigbedtobed_binary",
+        "bedtobigbed_binary",
+        "ixixx_binary",
+        "schema",
+        "chrom_sizes",
+        "bed_index",
     )
 
     def __init__(
@@ -148,14 +188,14 @@ class AnnotationIntegrator(CommandLineManager):
         bigbedtobed_binary: Union[str, os.PathLike],
         bedtobigbed_binary: Union[str, os.PathLike],
         ixixx_binary: Union[str, os.PathLike],
-        verbose: Optional[bool] = False
+        verbose: Optional[bool] = False,
     ) -> None:
         self.v: bool = verbose
         self.set_logging()
 
         ## parse the input dictionary
         self.ref_data: Dict[str, ReferenceBundle] = {}
-        with open(ref_data, 'r') as h:
+        with open(ref_data, "r") as h:
             bundles: Dict[str, Dict[str, str]] = json.loads(h.read())
             for i, (species, data) in enumerate(bundles.items()):
                 self.ref_data[species] = ReferenceBundle(data, priority=i)
@@ -163,8 +203,8 @@ class AnnotationIntegrator(CommandLineManager):
             self.accepted_statuses: List[str] = Constants.ALL_LOSS_SYMBOLS
         else:
             self.accepted_statuses: List[str] = [
-                x for x in accepted_statuses.split(',') if x
-            ] ## TODO: Add sanity checks
+                x for x in accepted_statuses.split(",") if x
+            ]  ## TODO: Add sanity checks
         self.query_projections: Dict[str, BedRecord] = {}
         self.query_proj2ref: Dict[str, str] = {}
         self.query_annotation: Dict[str, List[str]] = defaultdict(list)
@@ -185,28 +225,24 @@ class AnnotationIntegrator(CommandLineManager):
         if self.chrom_sizes is None and not (
             self.skip_ucsc or all(x.ucsc_bigbed is None for x in self.ref_data.values())
         ):
-            self._die(
-                'Query chromosome size file was not provided'
-            )
-        self.schema: str = os.path.join(
-            TOGA2_ROOT, 'supply', 'bb_schema_toga2.as'
-        )
+            self._die("Query chromosome size file was not provided")
+        self.schema: str = os.path.join(TOGA2_ROOT, "supply", "bb_schema_toga2.as")
         self.has_ucsc_data: List[str] = []
-        
+
         self.output: str = output
-        self.gene_tsv: str = os.path.join(output, 'query_genes.tsv')
-        self.gene_bed: str = os.path.join(output, 'query_genes.bed')
-        self.projection_bed: str = os.path.join(output, 'query_annotation.bed')
-        self.ucsc_dir: str = os.path.join(output, 'ucsc_browser_files')
+        self.gene_tsv: str = os.path.join(output, "query_genes.tsv")
+        self.gene_bed: str = os.path.join(output, "query_genes.bed")
+        self.projection_bed: str = os.path.join(output, "query_annotation.bed")
+        self.ucsc_dir: str = os.path.join(output, "ucsc_browser_files")
 
-        self.protein_file: str = os.path.join(output, 'protein.fa')
-        self.nucleotide_file: str = os.path.join(output, 'nucleotide.fa')
+        self.protein_file: str = os.path.join(output, "protein.fa")
+        self.nucleotide_file: str = os.path.join(output, "nucleotide.fa")
 
-        self.bigbed_stub: str = os.path.join(self.ucsc_dir, f'{prefix}.bed')
-        self.bigbed: str = os.path.join(self.ucsc_dir, f'{prefix}.bb')
-        self.ix: str = os.path.join(self.ucsc_dir, f'{prefix}.ix')
-        self.ixx: str = os.path.join(self.ucsc_dir, f'{prefix}.ixx')
-        self.bed_index: str = os.path.join(self.ucsc_dir, f'{prefix}.ix.txt')
+        self.bigbed_stub: str = os.path.join(self.ucsc_dir, f"{prefix}.bed")
+        self.bigbed: str = os.path.join(self.ucsc_dir, f"{prefix}.bb")
+        self.ix: str = os.path.join(self.ucsc_dir, f"{prefix}.ix")
+        self.ixx: str = os.path.join(self.ucsc_dir, f"{prefix}.ixx")
+        self.bed_index: str = os.path.join(self.ucsc_dir, f"{prefix}.ix.txt")
 
     def run(self) -> None:
         """Main execution method"""
@@ -230,7 +266,7 @@ class AnnotationIntegrator(CommandLineManager):
 
     def _check_binaries(self) -> None:
         """
-        Checks the provided UCSC binaries, 
+        Checks the provided UCSC binaries,
         looks for an alternative if needed
         """
         for attr, default_name in Constants.BINARIES_TO_CHECK.items():
@@ -238,100 +274,112 @@ class AnnotationIntegrator(CommandLineManager):
                 continue
             binary: Union[str, None] = getattr(self, attr)
             if binary is not None:
-                self._to_log('Testing %s binary at %s' % (default_name, binary))
+                self._to_log("Testing %s binary at %s" % (default_name, binary))
                 if os.access(binary, os.X_OK):
                     self._to_log(
-                        'The provided binary is executable; using the stated %s instance' % default_name
+                        "The provided binary is executable; using the stated %s instance"
+                        % default_name
                     )
                     continue
                 else:
                     self._to_log(
                         (
-                            '%s binary at %s does not seem to be executable; '
-                            'looking for alternatives'
-                        ) % (default_name, binary),
-                        'warning'
+                            "%s binary at %s does not seem to be executable; "
+                            "looking for alternatives"
+                        )
+                        % (default_name, binary),
+                        "warning",
                     )
             else:
                 self._to_log(
                     (
-                        'No %s executable was not provided; '
-                        'looking for alternatives in $PATH'
-                    ) % default_name
+                        "No %s executable was not provided; "
+                        "looking for alternatives in $PATH"
+                    )
+                    % default_name
                 )
-            self._to_log('Checking the default %s executable at TOGA2/bin' % default_name)
+            self._to_log(
+                "Checking the default %s executable at TOGA2/bin" % default_name
+            )
             default_path: str = os.path.join(BIN, default_name)
             if os.path.exists(default_path):
-                self._to_log('Found default %s executable at %s' % (default_name, default_path))
+                self._to_log(
+                    "Found default %s executable at %s" % (default_name, default_path)
+                )
                 if os.access(default_path, os.X_OK):
                     self._to_log(
-                        'The default UCSC %s binary is executable; using the default version' % default_name
+                        "The default UCSC %s binary is executable; using the default version"
+                        % default_name
                     )
                     self.__setattr__(attr, default_path)
                     continue
                 else:
                     self._to_log(
                         (
-                            'Default UCSC %s binary at %s does not seem to be executable; '
-                            'looking for alternatives in $PATH'
-                        ) % (default_name, default_path),
-                        'warning'
+                            "Default UCSC %s binary at %s does not seem to be executable; "
+                            "looking for alternatives in $PATH"
+                        )
+                        % (default_name, default_path),
+                        "warning",
                     )
             binary_in_path: Union[str, None] = which(default_name)
             if binary_in_path is not None:
                 self._to_log(
                     (
-                        'Found bigBedTobed instance at %s; '
-                        'checking the execution permissions'
-                    ) % binary_in_path
+                        "Found bigBedTobed instance at %s; "
+                        "checking the execution permissions"
+                    )
+                    % binary_in_path
                 )
                 if os.access(binary_in_path, os.X_OK):
                     self._to_log(
-                        'The found binary is executable; using the found %s instance' % default_name
+                        "The found binary is executable; using the found %s instance"
+                        % default_name
                     )
                     self.__setattr__(attr, binary_in_path)
                     continue
                 self._die(
                     (
-                        'The %s binary found in $PATH at %s is not executable; '
-                        'check your $PATH or provide a valid bigBedToBed instance'
-                    ) % (default_name, binary_in_path)
+                        "The %s binary found in $PATH at %s is not executable; "
+                        "check your $PATH or provide a valid bigBedToBed instance"
+                    )
+                    % (default_name, binary_in_path)
                 )
             self._die(
                 (
-                    'No %s binary found in $PATH; '
-                    'check your $PATH or provide a valid bigBedToBed instance'
-                ) % default_name
+                    "No %s binary found in $PATH; "
+                    "check your $PATH or provide a valid bigBedToBed instance"
+                )
+                % default_name
             )
-
 
     def read_annotation(self, species: str) -> None:
         """
         Parses the reference BED file, filtering the records by their loss status
         """
-        self._to_log('Reading annotation file for reference %s' % species)
+        self._to_log("Reading annotation file for reference %s" % species)
         file: str = self.ref_data[species].query_bed
         if not os.path.exists(file):
-            self._die('File %s does not exist' % file)
-        with open(file, 'r') as h:
+            self._die("File %s does not exist" % file)
+        with open(file, "r") as h:
             for i, line in enumerate(h, start=1):
-                data: List[str] = line.strip().split('\t')
+                data: List[str] = line.strip().split("\t")
                 if not data or not data[0]:
                     continue
                 if len(data) != BED_FIELD_NUM:
                     self._die(
                         (
-                            'Improper formatting at BED file %s line %i; '
-                            'expected %i fields, got %i'
-                        ) % (file, i, BED_FIELD_NUM, len(data))
+                            "Improper formatting at BED file %s line %i; "
+                            "expected %i fields, got %i"
+                        )
+                        % (file, i, BED_FIELD_NUM, len(data))
                     )
                 color: str = data[8]
                 status: str = COL2CLASS.get(color)
                 if status is None:
                     self._die(
-                        (
-                            'Invalid loss status color at BED file %s line %i: %s'
-                        ) % (file, i, color)
+                        ("Invalid loss status color at BED file %s line %i: %s")
+                        % (file, i, color)
                     )
                 # if status not in self.accepted_statuses:
                 #     continue
@@ -339,19 +387,27 @@ class AnnotationIntegrator(CommandLineManager):
                 chrom: str = data[0]
                 start: int = int(data[6])
                 end: int = int(data[7])
-                strand: bool = data[5] == '+'
-                line_template: str = '\t'.join([*data[:3], '{}', *data[4:8], '{}', *data[9:]])
+                strand: bool = data[5] == "+"
+                line_template: str = "\t".join(
+                    [*data[:3], "{}", *data[4:8], "{}", *data[9:]]
+                )
                 if name in self.query_projections:
-                    if ',' in name:
+                    if "," in name:
                         self.query_projections[name].lines.append(line_template)
                     else:
                         self._die(
-                            'Duplicated non-fragmented entry for reference %s: %s'
+                            "Duplicated non-fragmented entry for reference %s: %s"
                         ) % (species, name)
                 else:
                     record: BedRecord = BedRecord(
-                        name, species, chrom, start, end, strand, 
-                        status, [line_template]
+                        name,
+                        species,
+                        chrom,
+                        start,
+                        end,
+                        strand,
+                        status,
+                        [line_template],
                     )
                     self.query_projections[name] = record
                 self.query_proj2ref[name] = species
@@ -362,16 +418,16 @@ class AnnotationIntegrator(CommandLineManager):
         Extracts exon coordinates from the exon metadata file for a given species,
         removing missing/deleted and extrapolated exons
         """
-        self._to_log('Reading exon metadata file for reference %s' % species)
+        self._to_log("Reading exon metadata file for reference %s" % species)
         file: str = self.ref_data[species].exon_meta
-        gzipped: bool = file.endswith('.gz')
+        gzipped: bool = file.endswith(".gz")
         if not os.path.exists(file):
-            self._die('File %s does not exist' % file)
-        with (gzip.open(file, 'rb') if gzipped else open(file, 'r')) as h:
+            self._die("File %s does not exist" % file)
+        with gzip.open(file, "rb") if gzipped else open(file, "r") as h:
             for line in h:
                 if gzipped:
-                    line: str = line.decode('utf8')
-                data: List[str] = line.strip().split('\t')
+                    line: str = line.decode("utf8")
+                data: List[str] = line.strip().split("\t")
                 if not data or not data[0]:
                     continue
                 ## TODO: Array length check
@@ -394,23 +450,23 @@ class AnnotationIntegrator(CommandLineManager):
                 end: int = int(data[5])
                 strand: bool = data[6] == PLUS
                 exon_num: int = int(data[1])
-                record: str = ExonRecord(
-                    proj, exon_num, chrom, start, end, strand
-                )
+                record: str = ExonRecord(proj, exon_num, chrom, start, end, strand)
                 self.query_projections[proj].exons.append(record)
 
     def read_ref_isoforms(self, species: str) -> None:
         """Reads the transcript-to-gene mapping for a given reference"""
         file: str = self.ref_data[species].ref_isoforms
         if file is None:
-            self._to_log('No reference isoform file provided for reference %s' % species)
+            self._to_log(
+                "No reference isoform file provided for reference %s" % species
+            )
             return
         if not os.path.exists(file):
-            self._to_log('File %s does not exist; skipping' % file)
+            self._to_log("File %s does not exist; skipping" % file)
             return
-        with open(file, 'r') as h:
+        with open(file, "r") as h:
             for line in h:
-                data: List[str] = line.strip().split('\t')
+                data: List[str] = line.strip().split("\t")
                 if not data:
                     continue
                 gene, tr = data
@@ -420,13 +476,15 @@ class AnnotationIntegrator(CommandLineManager):
         """Extracts paralogous projections' names"""
         file: Union[str, None] = self.ref_data[species].paralogs
         if file is None:
-            self._to_log('No paralogous projection list provided for reference %s' % species)
+            self._to_log(
+                "No paralogous projection list provided for reference %s" % species
+            )
             return
         if not os.path.exists(file):
-            self._to_log('File %s does not exist; skipping' % file, 'warning')
+            self._to_log("File %s does not exist; skipping" % file, "warning")
             return
-        self._to_log('Reading paralogous projection list for reference %s' % species)
-        with open(file, 'r') as h:
+        self._to_log("Reading paralogous projection list for reference %s" % species)
+        with open(file, "r") as h:
             for line in h:
                 line = line.strip()
                 self.paralog_pool.add(line)
@@ -435,31 +493,36 @@ class AnnotationIntegrator(CommandLineManager):
         """Extracts processed pseudogene/retrogene projections' names"""
         file: Union[str, None] = self.ref_data[species].ppgenes
         if file is None:
-            self._to_log('No retrogene projection list provided for reference %s' % species)
+            self._to_log(
+                "No retrogene projection list provided for reference %s" % species
+            )
             return
         if not os.path.exists(file):
-            self._to_log('File %s does not exist; skipping' % file, 'warning')
+            self._to_log("File %s does not exist; skipping" % file, "warning")
             return
-        self._to_log('Reading retrogene projection list for reference %s' % species)
-        with open(file, 'r') as h:
+        self._to_log("Reading retrogene projection list for reference %s" % species)
+        with open(file, "r") as h:
             for line in h:
                 line = line.strip()
                 self.ppgene_pool.add(line)
 
     def infer_genes(self) -> None:
         """
-        Infers query genes from combined reference annotations. 
-        The logic is effectively borrowed from infer_query_genes.py : 
-        any two projections overlapping by at least one coding base 
+        Infers query genes from combined reference annotations.
+        The logic is effectively borrowed from infer_query_genes.py :
+        any two projections overlapping by at least one coding base
         """
-        self._to_log('Inferring query genes from the combined annotation; might take a while')
+        self._to_log(
+            "Inferring query genes from the combined annotation; might take a while"
+        )
         ## create the graph structure
         ## iterate over chromosomes
         for chrom, projections in self.query_annotation.items():
             ## sort the projections
             projections.sort(
                 key=lambda x: (
-                    self.query_projections[x].start, self.query_projections[x].end
+                    self.query_projections[x].start,
+                    self.query_projections[x].end,
                 )
             )
             ## start iterating over projections
@@ -472,14 +535,14 @@ class AnnotationIntegrator(CommandLineManager):
                 out_ortholog: bool = not (out_paralog or out_ppgene)
                 discarded: bool = False
                 edges: List[str] = []
-                for j, name_in in enumerate(projections[i+1:], start=i):
+                for j, name_in in enumerate(projections[i + 1 :], start=i):
                     proj_in: BedRecord = self.query_projections[name_in]
                     ## if an item has been already discarded, skip it
                     if name_in in self.discarded_items:
                         continue
                     in_start: int = proj_in.start
                     in_end: int = proj_in.end
-                    ## as long as transcripts are sorted properly, 
+                    ## as long as transcripts are sorted properly,
                     ## it's safe to break the inner loop here
                     if in_start >= out_end:
                         break
@@ -496,7 +559,12 @@ class AnnotationIntegrator(CommandLineManager):
                     has_intersection: bool = False
                     for ex_out in proj_out.exons:
                         for ex_in in proj_in.exons:
-                            if intersection(ex_out.start, ex_out.end, ex_in.start, ex_in.end) > 0:
+                            if (
+                                intersection(
+                                    ex_out.start, ex_out.end, ex_in.start, ex_in.end
+                                )
+                                > 0
+                            ):
                                 has_intersection = True
                                 break
                         if has_intersection:
@@ -535,10 +603,10 @@ class AnnotationIntegrator(CommandLineManager):
             ignore all other isoforms;
             *   If two or more isoforms are completely identical in terms of coordinates,
                 pick the one with the better loss status;
-            *   If two or more isoforms have identical layout and loss status, pick the one 
+            *   If two or more isoforms have identical layout and loss status, pick the one
                 corresponding to a higher priority reference/run;
             *   Otherwise, pick the first encountered representative for this layout-status-priority combination
-        *   If no projections with the requested status have been encountered, pick the one 
+        *   If no projections with the requested status have been encountered, pick the one
         """
         if NX_VERSION < 2.4:
             components = list(nx.connected_component_subgraphs(self.graph))
@@ -547,23 +615,23 @@ class AnnotationIntegrator(CommandLineManager):
                 self.graph.subgraph(c) for c in nx.connected_components(self.graph)
             ]
         with (
-            open(self.gene_tsv, 'w') as gt, 
-            open(self.gene_bed, 'w') as gb, 
-            open(self.projection_bed, 'w') as qb
-        ): 
+            open(self.gene_tsv, "w") as gt,
+            open(self.gene_bed, "w") as gb,
+            open(self.projection_bed, "w") as qb,
+        ):
             for component in components:
                 ## initialize a temporary storage for initial candidates
                 selected: Dict[str, str] = {}
                 ## define the best class
                 best_status: int = 0
-                ## set a semaphore for whether the user-defined loss classes 
+                ## set a semaphore for whether the user-defined loss classes
                 ## have been encountered in the clique
                 allowed_class_found: bool = False
                 for name in component:
                     proj: BedRecord = self.query_projections[name]
                     status: int = CLASS_TO_NUM[proj.loss_status]
                     allowed_status: bool = proj.loss_status in self.accepted_statuses
-                    if allowed_status: ## let this projection in
+                    if allowed_status:  ## let this projection in
                         if not allowed_class_found:
                             ## this is the first representative of the allowed loss classes;
                             ## wipe out the previous instances
@@ -574,7 +642,7 @@ class AnnotationIntegrator(CommandLineManager):
                         if status < best_status:
                             continue
                     ## at this point, this is a likely candidate
-                    ## however, chances are an item in exactly the same coordinates 
+                    ## however, chances are an item in exactly the same coordinates
                     ## has been already found
                     if proj.lines[0] in selected:
                         prev_name: str = selected[proj.lines[0]]
@@ -589,7 +657,7 @@ class AnnotationIntegrator(CommandLineManager):
                             priority: int = self.ref_data[species].priority
                             prev_species: str = self.query_proj2ref[prev_name]
                             prev_priority: int = self.ref_data[prev_species].priority
-                            ## if the previous prediction's priority is higher (lower) or equal, keep it 
+                            ## if the previous prediction's priority is higher (lower) or equal, keep it
                             if prev_priority <= priority:
                                 continue
                         ## otherwise, the new prediction is the winner
@@ -601,40 +669,43 @@ class AnnotationIntegrator(CommandLineManager):
                 ]
                 ## define the coordinates; that's the easy part
                 chrom: str = all_projs[0].chrom
-                strand: str = '+' if all_projs[0].strand else '-'
+                strand: str = "+" if all_projs[0].strand else "-"
                 start: int = min([x.start for x in all_projs])
                 end: int = max([x.end for x in all_projs])
                 ## define the name; a slightly trickier part
                 ## first, define how many gene participate in the locus annotation
                 genes: Set[str] = {
-                    self.ref_proj2gene.get(
-                        get_proj2trans(x.name)[0], x.name
-                    ) for x in all_projs
+                    self.ref_proj2gene.get(get_proj2trans(x.name)[0], x.name)
+                    for x in all_projs
                 }
                 ## second, define prefix
                 if any(base_proj_name(x.name) in self.paralog_pool for x in all_projs):
-                    prefix: str = 'paralog_'
+                    prefix: str = "paralog_"
                 elif any(base_proj_name(x.name) in self.ppgene_pool for x in all_projs):
-                    prefix: str = 'retro_'
+                    prefix: str = "retro_"
                 elif not allowed_class_found:
-                    if best_status > CLASS_TO_NUM['M']:
-                        prefix: str = 'lost_'
+                    if best_status > CLASS_TO_NUM["M"]:
+                        prefix: str = "lost_"
                     else:
-                        prefix: str = 'missing_'
+                        prefix: str = "missing_"
                 else:
-                    prefix: str = ''
+                    prefix: str = ""
                 ## define the main name; for simplicity, do not bother with chain numbers
-                if len(genes) == 1: ## single gene; assign its name to query locus
+                if len(genes) == 1:  ## single gene; assign its name to query locus
                     gene: str = genes.pop()
-                elif len(genes) < 4: ## up to three genes; combine their names separated by comma
-                    gene: str = ','.join(genes)
-                else: ## more than three genes; gene+
-                    gene: str = genes.pop() + '+'
+                elif (
+                    len(genes) < 4
+                ):  ## up to three genes; combine their names separated by comma
+                    gene: str = ",".join(genes)
+                else:  ## more than three genes; gene+
+                    gene: str = genes.pop() + "+"
                 name: str = prefix + gene
                 ## done! now, write the output
                 ## for gene BED, it's a single line
-                gene_bed: str = '\t'.join(map(str, [chrom, start, end, name, 0, strand]))
-                gb.write(gene_bed + '\n')
+                gene_bed: str = "\t".join(
+                    map(str, [chrom, start, end, name, 0, strand])
+                )
+                gb.write(gene_bed + "\n")
                 ## then, iterate over projection
                 for proj in all_projs:
                     basename: str = base_proj_name(proj.name)
@@ -642,87 +713,86 @@ class AnnotationIntegrator(CommandLineManager):
                     ## get the reference name and add it as a prefix
                     species: str = self.query_proj2ref[proj.name]
                     ## gene isoform file; write the gene and projections names
-                    gt.write(name + '\t' + f'{species}.{proj.name}' + '\n')
+                    gt.write(name + "\t" + f"{species}.{proj.name}" + "\n")
                     ## projection BED file; write the original BED line
                     for proj_bed in proj.return_bed_line(prefix=species):
-                        qb.write(proj_bed + '\n')
+                        qb.write(proj_bed + "\n")
 
     def prepare_ucsc_file(self) -> None:
         """
-        Parses the UCSC BigBed file, extracting the lines for integrated annotation BigBed 
-        as well as sequences for final sequence files 
+        Parses the UCSC BigBed file, extracting the lines for integrated annotation BigBed
+        as well as sequences for final sequence files
         """
         if self.skip_ucsc:
-            self._to_log('Skipping the joint UCSC BigBed file creation as suggested')
+            self._to_log("Skipping the joint UCSC BigBed file creation as suggested")
             return
         nuc_seqs: List[str] = []
         prot_seqs: List[str] = []
         longest_word: int = 0
-        with open(self.bigbed_stub, 'w') as h:
+        with open(self.bigbed_stub, "w") as h:
             for ref, data in self.ref_data.items():
                 seqs_found: Set[str] = set()
                 file: str = data.ucsc_bigbed
                 if file is None:
                     self._to_log(
-                        'No UCSC BigBed file provided for reference %s; skipping' % ref,
-                        'warning'
+                        "No UCSC BigBed file provided for reference %s; skipping" % ref,
+                        "warning",
                     )
                     continue
                 if not os.path.exists(file):
-                    self._die(
-                        'UCSC BigBed file %s does not exist' % file
-                    )
+                    self._die("UCSC BigBed file %s does not exist" % file)
                 self.has_ucsc_data.append(ref)
-                read_cmd: str = f'{self.bigbedtobed_binary} {file} stdout'
+                read_cmd: str = f"{self.bigbedtobed_binary} {file} stdout"
                 output: TextIO = self._exec(
-                    read_cmd, 'Attempt to read BigBed file %s failed: ' % file
+                    read_cmd, "Attempt to read BigBed file %s failed: " % file
                 )
-                for line in output.split('\n'):
+                for line in output.split("\n"):
                     # line = line.decode('utf8')
-                    data: List[str] = line.strip().split('\t')
+                    data: List[str] = line.strip().split("\t")
                     if not data or not data[0]:
                         continue
                     name: str = data[3]
                     basename: str = base_proj_name(name)
                     if basename not in self.final_projections:
                         continue
-                    h.write(line + '\n')
+                    h.write(line + "\n")
                     longest_word = max(longest_word, len(name))
                     if basename in seqs_found:
                         continue
                     nuc_seq: str = data[34]
-                    nuc_seqs.append(f'>{ref}.{name}\n{nuc_seq}')
+                    nuc_seqs.append(f">{ref}.{name}\n{nuc_seq}")
                     prot_seq: str = data[35]
-                    prot_seqs.append(f'>{ref}.{name}\n{prot_seq}')
+                    prot_seqs.append(f">{ref}.{name}\n{prot_seq}")
                     seqs_found.add(basename)
-        ## sort the resulting file, convert it into BigBed format 
+        ## sort the resulting file, convert it into BigBed format
         bb_cmd: str = (
-            f'sort -k1,1 -k2,2n -o {self.bigbed_stub} {self.bigbed_stub} && '
-            f'{self.bedtobigbed_binary} -type=bed12+26 {self.bigbed_stub} '
-            f'{self.chrom_sizes} {self.bigbed} '
-            f'-tab -extraIndex=name -as={self.schema}'
+            f"sort -k1,1 -k2,2n -o {self.bigbed_stub} {self.bigbed_stub} && "
+            f"{self.bedtobigbed_binary} -type=bed12+26 {self.bigbed_stub} "
+            f"{self.chrom_sizes} {self.bigbed} "
+            f"-tab -extraIndex=name -as={self.schema}"
         )
-        _ = self._exec(bb_cmd, 'BigBed generation failed: ')
-        self._to_log('BigBed file successfully created')
-        bed_ix_cmd: str = f'{MAKE_IX_SCRIPT} {self.bigbed_stub} | sort -u > {self.bed_index}'
-        _ = self._exec(bed_ix_cmd, 'BED file indexing failed')
+        _ = self._exec(bb_cmd, "BigBed generation failed: ")
+        self._to_log("BigBed file successfully created")
+        bed_ix_cmd: str = (
+            f"{MAKE_IX_SCRIPT} {self.bigbed_stub} | sort -u > {self.bed_index}"
+        )
+        _ = self._exec(bed_ix_cmd, "BED file indexing failed")
         bigbed_ix_cmd: str = (
-            f'{self.ixixx_binary} {self.bed_index} {self.ix} {self.ixx} '
-            f'-maxWordLength={longest_word}'
+            f"{self.ixixx_binary} {self.bed_index} {self.ix} {self.ixx} "
+            f"-maxWordLength={longest_word}"
         )
-        _ = self._exec(bigbed_ix_cmd, 'Index creation for UCSC BigBed file failed: ')
-        self._to_log('BigBed index successfully created; removing the temporary files')
+        _ = self._exec(bigbed_ix_cmd, "Index creation for UCSC BigBed file failed: ")
+        self._to_log("BigBed index successfully created; removing the temporary files")
         self._rm(self.bigbed_stub)
         self._rm(self.bed_index)
         if prot_seqs:
-            with open(self.protein_file, 'w') as h:
+            with open(self.protein_file, "w") as h:
                 for prot in prot_seqs:
-                    h.write(prot + '\n')
+                    h.write(prot + "\n")
         if nuc_seqs:
-            with open(self.nucleotide_file, 'w') as h:
+            with open(self.nucleotide_file, "w") as h:
                 for nuc in nuc_seqs:
-                    h.write(nuc + '\n')
-
+                    h.write(nuc + "\n")
 
     def prepare_sequence_files(self) -> None:
         """p"""
@@ -734,48 +804,52 @@ class AnnotationIntegrator(CommandLineManager):
             if prot_file is None or not os.path.exists(prot_file):
                 self._die(
                     (
-                        'Reference %s has neither valid UCSC BigBed file '
-                        'nor valid protein sequence file'
-                    ) % ref
+                        "Reference %s has neither valid UCSC BigBed file "
+                        "nor valid protein sequence file"
+                    )
+                    % ref
                 )
             nuc_file: str = data.nucleotide_file
             if nuc_file is None or not os.path.exists(nuc_file):
                 self._die(
                     (
-                        'Reference %s has neither valid UCSC BigBed file '
-                        'nor valid nucleotide sequence file'
-                    ) % ref
+                        "Reference %s has neither valid UCSC BigBed file "
+                        "nor valid nucleotide sequence file"
+                    )
+                    % ref
                 )
-            prot_gzipped: bool = prot_file.endswith('.gz')
-            with (gzip.open(prot_file, 'rb') if prot_gzipped else open(prot_file, 'r')) as h:
+            prot_gzipped: bool = prot_file.endswith(".gz")
+            with (
+                gzip.open(prot_file, "rb") if prot_gzipped else open(prot_file, "r")
+            ) as h:
                 prot_seqs: List[str] = self._read_fasta(h, ref)
-            nuc_gzipped: bool = nuc_file.endswith('.gz')
-            with (gzip.open(nuc_file, 'rb') if nuc_gzipped else open(nuc_file, 'r')) as h:
+            nuc_gzipped: bool = nuc_file.endswith(".gz")
+            with gzip.open(nuc_file, "rb") if nuc_gzipped else open(nuc_file, "r") as h:
                 nuc_seqs: List[str] = self._read_fasta(h, ref)
-            write_mode: str = 'a' if seq_files_recorded else 'w'
+            write_mode: str = "a" if seq_files_recorded else "w"
             with open(self.protein_file, write_mode) as h:
                 for entry in prot_seqs:
-                    h.write(entry + '\n')
+                    h.write(entry + "\n")
             with open(self.nucleotide_file, write_mode) as h:
                 for entry in nuc_seqs:
-                    h.write(entry + '\n')
+                    h.write(entry + "\n")
             seq_files_recorded = True
 
     def _read_fasta(self, handle: TextIO, ref: str) -> List[str]:
         """
         Reads the sequence file, return the list of FASTA entries corresponding to integrated annotation
         """
-        header: str = ''
-        seq: str = ''
+        header: str = ""
+        seq: str = ""
         sequences: List[str] = []
         for line in handle:
             line = line.strip()
-            if line.startswith('>'):
+            if line.startswith(">"):
                 if header:
-                    entry: str = f'>{ref}.{header}\n{seq}'
+                    entry: str = f">{ref}.{header}\n{seq}"
                     sequences.append(entry)
-                header = ''
-                seq = ''
+                header = ""
+                seq = ""
                 proj: str = base_proj_name(header.split()[0])
                 if proj not in self.final_projections:
                     continue
@@ -783,7 +857,7 @@ class AnnotationIntegrator(CommandLineManager):
             if header:
                 seq += line
         if seq:
-            entry: str = f'>{ref}.{header}\n{seq}'
+            entry: str = f">{ref}.{header}\n{seq}"
             sequences.append(entry)
 
     def set_logging(self) -> None:

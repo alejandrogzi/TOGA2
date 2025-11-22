@@ -5,62 +5,106 @@ A speed-up version of processed_segment.py
 Most likely a final solution make
 """
 
-from .cesar_wrapper_constants import (
-    AA_CODE, ALT_FRAME_REASON, ALT_MASKING_REASON,
-    BIG_DEL, BIG_INDEL, BIG_INDEL_SIZE, BIG_INS, 
-    CLASS_TO_COL, CLASS_TO_NAME,
-    COMPENSATION, COMPENSATION_REASON,
-    DEL_EXON, DEL_MISS,
-    EX_DEL_REASON, EX_MISS_REASON,
-    GAP_CODON, FS_DEL, FS_INDELS, FS_INS,
-    INTACT_CODON_LOSS_THRESHOLD, 
-    INTRON_GAIN, INTRON_GAIN_MASK_REASON,
-    LEFT_SPLICE_CORR,  LEFT_SPLICE_CORR_U12,
-    MAX_MISSING_PM_THRESHOLD, MAX_RETAINED_INTRON_LEN, 
-    MIN_BLOSUM_THRESHOLD, MIN_ID_THRESHOLD, 
-    MIN_INTRON_LENGTH, MIN_INTACT_UL_FRACTION, 
-    MISS_EXON, NNN_CODON, 
-    NON_CANON_U2_REASON, NON_DEL_LOSS_THRESHOLD, 
-    ORTHOLOG, OBSOLETE_COMPENSATION,
-    RIGHT_SPLICE_CORR, RIGHT_SPLICE_CORR_U12,
-    PARALOG, PROC_PSEUDOGENE,
-    SAFE_SPLICE_SITE_REASONS,
-    SAFE_UNMASKABLE_REASONS, SAFE_UNMASKABLE_TYPES,
-    SSM_A, SSM_D,
-    START, START_MISSING, 
-    STRICT_FACTION_INTACT_THRESHOLD,
-    STOP, STOPS, STOP_MISSING, 
-    TERMINAL_EXON_DEL_SIZE, U12_REASON,
-    FI, I, PI, UL, L, M, PG, PP
-)
-from .cesar_wrapper_executables import (
-    assess_exon_quality, check_codon,
-    get_affected_exon_threshold, 
-    get_blosum_score, get_d_runs,
-    process_codon_pair, process_and_translate,
-    Mutation, RawCesarOutput
-)
 from collections import defaultdict
 from logging import Logger
 from math import floor
+from typing import Any, Dict, Iterable, List, Optional, Set, Tuple, TypeVar, Union
+
+from .cesar_wrapper_constants import (
+    AA_CODE,
+    ALT_FRAME_REASON,
+    ALT_MASKING_REASON,
+    BIG_DEL,
+    BIG_INDEL,
+    BIG_INDEL_SIZE,
+    BIG_INS,
+    CLASS_TO_COL,
+    CLASS_TO_NAME,
+    COMPENSATION,
+    COMPENSATION_REASON,
+    DEL_EXON,
+    DEL_MISS,
+    EX_DEL_REASON,
+    EX_MISS_REASON,
+    FI,
+    FS_DEL,
+    FS_INDELS,
+    FS_INS,
+    GAP_CODON,
+    INTACT_CODON_LOSS_THRESHOLD,
+    INTRON_GAIN,
+    INTRON_GAIN_MASK_REASON,
+    LEFT_SPLICE_CORR,
+    LEFT_SPLICE_CORR_U12,
+    MAX_MISSING_PM_THRESHOLD,
+    MAX_RETAINED_INTRON_LEN,
+    MIN_BLOSUM_THRESHOLD,
+    MIN_ID_THRESHOLD,
+    MIN_INTACT_UL_FRACTION,
+    MIN_INTRON_LENGTH,
+    MISS_EXON,
+    NNN_CODON,
+    NON_CANON_U2_REASON,
+    NON_DEL_LOSS_THRESHOLD,
+    OBSOLETE_COMPENSATION,
+    ORTHOLOG,
+    PARALOG,
+    PG,
+    PI,
+    PP,
+    PROC_PSEUDOGENE,
+    RIGHT_SPLICE_CORR,
+    RIGHT_SPLICE_CORR_U12,
+    SAFE_SPLICE_SITE_REASONS,
+    SAFE_UNMASKABLE_REASONS,
+    SAFE_UNMASKABLE_TYPES,
+    SSM_A,
+    SSM_D,
+    START,
+    START_MISSING,
+    STOP,
+    STOP_MISSING,
+    STOPS,
+    STRICT_FACTION_INTACT_THRESHOLD,
+    TERMINAL_EXON_DEL_SIZE,
+    U12_REASON,
+    UL,
+    I,
+    L,
+    M,
+)
+from .cesar_wrapper_executables import (
+    Mutation,
+    RawCesarOutput,
+    assess_exon_quality,
+    check_codon,
+    get_affected_exon_threshold,
+    get_blosum_score,
+    get_d_runs,
+    process_and_translate,
+    process_codon_pair,
+)
 from .shared import intersection, nn, parts, safe_div
-from typing import (
-    Any, Dict, Iterable, List, Optional, Set, Tuple, TypeVar, Union
-)
 from .ucsc_report import (
-    exon_aln_entry, exon_aln_header, format_fasta_as_aln, 
-    mutation_table, ProjectionPlotter
+    ProjectionPlotter,
+    exon_aln_entry,
+    exon_aln_header,
+    format_fasta_as_aln,
+    mutation_table,
 )
 
-__author__ = 'Yury V. Malovichko'
-__year__ = '2024'
-__credits__ = ('Michael Hiller', 'Bogdan Kirilenko')
+__author__ = "Yury V. Malovichko"
+__year__ = "2024"
+__credits__ = ("Michael Hiller", "Bogdan Kirilenko")
 
-SelenoCysteineTuple = TypeVar('SelenoCysteineTuple', bound='Tuple[int, int, str]')
+SelenoCysteineTuple = TypeVar("SelenoCysteineTuple", bound="Tuple[int, int, str]")
+
 
 class Coords:
     """Stores start and stop coordinates"""
-    __slots__ = ('start', 'stop')
+
+    __slots__ = ("start", "stop")
+
     def __init__(self, start: int, stop: int) -> None:
         self.start = start
         self.stop = stop
@@ -75,14 +119,12 @@ class Coords:
 
 def has_spliceai_data(splice_sites: Dict[int, Dict[str, List[int]]]) -> bool:
     """Checks if any SpliceAI data predictions were provided"""
-    return any(
-        splice_sites[x][y] for x in splice_sites for y in splice_sites[x]
-    )
+    return any(splice_sites[x][y] for x in splice_sites for y in splice_sites[x])
 
 
 def is_symbol(base: str) -> bool:
     """Estimates whether the symbol is a valid coding symbol, i.e. letter or gap"""
-    return base.isalpha() or base == '-'
+    return base.isalpha() or base == "-"
 
 
 def is_complete_codon(codon: str) -> bool:
@@ -92,14 +134,14 @@ def is_complete_codon(codon: str) -> bool:
 
 def strip_noncoding(string: str, uppercase_only: bool = True) -> str:
     """Removes noncoding symbols from the nucleotide string"""
-    return ''.join(
+    return "".join(
         x for x in string if (x.isupper() if uppercase_only else x.isalpha())
     )
 
 
 def frameshift_codon(codon: str) -> bool:
     """Returns whether a codon contains a frameshift mutation"""
-    return codon.count('-') % 3 != 0 and codon != GAP_CODON# or len(codon) % 3 != 0
+    return codon.count("-") % 3 != 0 and codon != GAP_CODON  # or len(codon) % 3 != 0
 
 
 class ProcessedSegment:
@@ -108,43 +150,122 @@ class ProcessedSegment:
     single segment and configuration. Internally, the class does the following:
 
     """
+
     __slots__ = (
-        'transcript', 'segment', 'configuration', 'matrix', 'u12',
-        'mask_terminal_mutations', 'rescue_missing_start', 'rescue_missing_stop',
-        'min_gap_size', 'correction_mode', 'min_splice_prob', 'prob_margin',
-        'acceptor_flank', 'donor_flank', 
-        'correct_ultrashort_introns', 'ignore_alternative_frame',
-        'is_paralog', 'is_processed_pseudogene', 'logger',
-        'reference', 'query', 'reference_length', 'portion2coords',
-        'portion2abs_coords', 'portion2strand', 'exon2portion', 'exon2chrom',
-        'exon2chain', 'exon2asmgaps', 'unaligned_exons', 'gap_located_exons',
-        'out_of_chain_exons', 'expected_coordinates', 'exon_search_spaces',
-        'chains', 'last_aligned_base', 'ref_exon_lengths', 'aln_lengths',
-        'reference_length', 'exon2ref_codons', 'exon2codons', 'rel_exon_coords',
-        'abs_exon_coords', 'cesar_rel_coords', 'clipped_rel_coords', 'spliceai_sites',
-        'splice_site_nucs', 'intron2phase',
-        'exon_num', 'has_spliceai_data', 'donor_site_prob',
-        'acc_site_prob', 'cesar_donor_support', 'cesar_acc_support',
-        'spliceai_donor_support', 'spliceai_acc_support', 'found_in_exp_locus', 'corrected_frame',
-        'exon_evidence', 'all_ref_codons', 'all_query_codons', 'ref_aa_seq',
-        'query_aa_seq', 'triplet_coordinates', 'codon_coordinates',
-        'triplet2ref_codon', 'ref_codon2triplets', 'ref_codons_to_mask',
-        'query_codons_to_mask', 'query_atgs', 'split_codon_struct',
-        'intron_deleted', 'intersects_gap', 'mutation_list', 'selenocysteine_codons', 
-        'exon_presence', 'exon_quality', 'codon2mutations', 'ref_codon2mutations',
-        'exon2mutations', 'deletion2mask', 'introns_gained',
-        'abs_nuc_ids', 'blosum_self_values', 'blosum_diff_values', 'nuc_ids',
-        'blosum_ids', 'nuc_id', 'blosum_id',
-        'frameshift_counter', 'spliceai_compensations', 
-        'alt_frame_masked', 'comps_to_delete',
-        'nonsense_counter', 'indel_counter',
-        'acc_mutation_counter', 'donor_mutation_counter', 'compensation_counter',
-        'deleted_exon_counter', 'missing_exon_counter', 'mdel_counter',
-        'frameshift2compensation', 'alternative_frames', 'stop_updated',
-        'loss_status', 'longest_fraction_strict', 'longest_fraction_relaxed',
-        'total_intact_fraction', 'missing_portion_of_ref',
-        'middle_is_intact', 'middle_is_present',
-        'name', 'svg', 'v'
+        "transcript",
+        "segment",
+        "configuration",
+        "matrix",
+        "u12",
+        "mask_terminal_mutations",
+        "rescue_missing_start",
+        "rescue_missing_stop",
+        "min_gap_size",
+        "correction_mode",
+        "min_splice_prob",
+        "prob_margin",
+        "acceptor_flank",
+        "donor_flank",
+        "correct_ultrashort_introns",
+        "ignore_alternative_frame",
+        "is_paralog",
+        "is_processed_pseudogene",
+        "logger",
+        "reference",
+        "query",
+        "reference_length",
+        "portion2coords",
+        "portion2abs_coords",
+        "portion2strand",
+        "exon2portion",
+        "exon2chrom",
+        "exon2chain",
+        "exon2asmgaps",
+        "unaligned_exons",
+        "gap_located_exons",
+        "out_of_chain_exons",
+        "expected_coordinates",
+        "exon_search_spaces",
+        "chains",
+        "last_aligned_base",
+        "ref_exon_lengths",
+        "aln_lengths",
+        "reference_length",
+        "exon2ref_codons",
+        "exon2codons",
+        "rel_exon_coords",
+        "abs_exon_coords",
+        "cesar_rel_coords",
+        "clipped_rel_coords",
+        "spliceai_sites",
+        "splice_site_nucs",
+        "intron2phase",
+        "exon_num",
+        "has_spliceai_data",
+        "donor_site_prob",
+        "acc_site_prob",
+        "cesar_donor_support",
+        "cesar_acc_support",
+        "spliceai_donor_support",
+        "spliceai_acc_support",
+        "found_in_exp_locus",
+        "corrected_frame",
+        "exon_evidence",
+        "all_ref_codons",
+        "all_query_codons",
+        "ref_aa_seq",
+        "query_aa_seq",
+        "triplet_coordinates",
+        "codon_coordinates",
+        "triplet2ref_codon",
+        "ref_codon2triplets",
+        "ref_codons_to_mask",
+        "query_codons_to_mask",
+        "query_atgs",
+        "split_codon_struct",
+        "intron_deleted",
+        "intersects_gap",
+        "mutation_list",
+        "selenocysteine_codons",
+        "exon_presence",
+        "exon_quality",
+        "codon2mutations",
+        "ref_codon2mutations",
+        "exon2mutations",
+        "deletion2mask",
+        "introns_gained",
+        "abs_nuc_ids",
+        "blosum_self_values",
+        "blosum_diff_values",
+        "nuc_ids",
+        "blosum_ids",
+        "nuc_id",
+        "blosum_id",
+        "frameshift_counter",
+        "spliceai_compensations",
+        "alt_frame_masked",
+        "comps_to_delete",
+        "nonsense_counter",
+        "indel_counter",
+        "acc_mutation_counter",
+        "donor_mutation_counter",
+        "compensation_counter",
+        "deleted_exon_counter",
+        "missing_exon_counter",
+        "mdel_counter",
+        "frameshift2compensation",
+        "alternative_frames",
+        "stop_updated",
+        "loss_status",
+        "longest_fraction_strict",
+        "longest_fraction_relaxed",
+        "total_intact_fraction",
+        "missing_portion_of_ref",
+        "middle_is_intact",
+        "middle_is_present",
+        "name",
+        "svg",
+        "v",
     )
 
     def __init__(
@@ -170,7 +291,7 @@ class ProcessedSegment:
         is_paralog: bool,
         is_processed_pseudogene: bool,
         logger: Logger,
-        verbose: bool
+        verbose: bool,
     ) -> None:
         self.transcript: str = transcript
         self.segment: int = segment
@@ -193,36 +314,76 @@ class ProcessedSegment:
         self.is_processed_pseudogene: bool = is_processed_pseudogene
         self.logger: Logger = logger
 
-        self.reference: str = ''
-        self.query: str = ''
-        self.reference_length: int = 0 ## stores the ungapped reference sequence length
-        self.portion2coords: Dict[int, Tuple[int]] = {} ## stores CESAR alignment portion coordinates in the concatenated sequences
-        self.portion2abs_coords: Dict[int, Tuple[str, int]] = {} ## stores query coordinate for each CESAR output entity
-        self.portion2strand: Dict[int, bool] = {} ## stores strand data for each CESAR output entity
-        self.exon2portion: Dict[int, int] = {} ## stores which alignment portion the given exon was aligned in
-        self.exon2chrom: Dict[int, str] = {} ## stores the chromosomes the respective exon's alignments refer to
-        self.exon2chain: Dict[int, str] = {} ## stores the chains that were fo respective exons' alignment
-        self.exon2asmgaps: Dict[int, bool] = {} ## stores whether the exon's search space contained assembly gaps
-        self.unaligned_exons: Set[int] = set() ## stores which exons were replace with was_not_aligneds
-        self.gap_located_exons: Set[int] = set() ## stores exons which were correspond to a chain gap
-        self.out_of_chain_exons: Set[int] = set() ## stores exons which were not aligned
-        self.expected_coordinates: Dict[int, Tuple[int]] = {} ## stores expected exon coordinates prior to flank addition
-        self.exon_search_spaces: Dict[int, Tuple[int]] = {} ## stores exon coordinates after flank addition
-        self.chains: List[str] = [] ## stores all the chains used for all the CESAR alignments
-        self.last_aligned_base: int = 0 ## stores the relative coordinate of the last base aligned in CESAR output
-        self.ref_exon_lengths: Dict[int, int] = {} ## stores reference exon lengths
-        self.aln_lengths: Dict[int, int] = {} ## stores exonwise alignment lengths
-        self.reference_length: int = 0 ## overall reference transcript length
-        self.exon2ref_codons: Dict[int, Tuple[int]] = {} ## maps query exons to first and last codon of their reference counterpart
-        self.rel_exon_coords: Dict[int, Coords] = {} ## maps exon to relative coordinates in the alignment
-        self.clipped_rel_coords: Dict[int, Coords] = {} ## maps exons to relative coordinates after clipping termini aligned to assembly gaps
-        self.abs_exon_coords: Dict[int, Coords] = {} ## maps reference exons to coordinates in the query
-        self.cesar_rel_coords: Dict[int, Coords] = {} ## maps exons to CESAR alignment coordinates
+        self.reference: str = ""
+        self.query: str = ""
+        self.reference_length: int = 0  ## stores the ungapped reference sequence length
+        self.portion2coords: Dict[
+            int, Tuple[int]
+        ] = {}  ## stores CESAR alignment portion coordinates in the concatenated sequences
+        self.portion2abs_coords: Dict[
+            int, Tuple[str, int]
+        ] = {}  ## stores query coordinate for each CESAR output entity
+        self.portion2strand: Dict[
+            int, bool
+        ] = {}  ## stores strand data for each CESAR output entity
+        self.exon2portion: Dict[
+            int, int
+        ] = {}  ## stores which alignment portion the given exon was aligned in
+        self.exon2chrom: Dict[
+            int, str
+        ] = {}  ## stores the chromosomes the respective exon's alignments refer to
+        self.exon2chain: Dict[
+            int, str
+        ] = {}  ## stores the chains that were fo respective exons' alignment
+        self.exon2asmgaps: Dict[
+            int, bool
+        ] = {}  ## stores whether the exon's search space contained assembly gaps
+        self.unaligned_exons: Set[int] = (
+            set()
+        )  ## stores which exons were replace with was_not_aligneds
+        self.gap_located_exons: Set[int] = (
+            set()
+        )  ## stores exons which were correspond to a chain gap
+        self.out_of_chain_exons: Set[int] = (
+            set()
+        )  ## stores exons which were not aligned
+        self.expected_coordinates: Dict[
+            int, Tuple[int]
+        ] = {}  ## stores expected exon coordinates prior to flank addition
+        self.exon_search_spaces: Dict[
+            int, Tuple[int]
+        ] = {}  ## stores exon coordinates after flank addition
+        self.chains: List[
+            str
+        ] = []  ## stores all the chains used for all the CESAR alignments
+        self.last_aligned_base: int = 0  ## stores the relative coordinate of the last base aligned in CESAR output
+        self.ref_exon_lengths: Dict[int, int] = {}  ## stores reference exon lengths
+        self.aln_lengths: Dict[int, int] = {}  ## stores exonwise alignment lengths
+        self.reference_length: int = 0  ## overall reference transcript length
+        self.exon2ref_codons: Dict[
+            int, Tuple[int]
+        ] = {}  ## maps query exons to first and last codon of their reference counterpart
+        self.rel_exon_coords: Dict[
+            int, Coords
+        ] = {}  ## maps exon to relative coordinates in the alignment
+        self.clipped_rel_coords: Dict[
+            int, Coords
+        ] = {}  ## maps exons to relative coordinates after clipping termini aligned to assembly gaps
+        self.abs_exon_coords: Dict[
+            int, Coords
+        ] = {}  ## maps reference exons to coordinates in the query
+        self.cesar_rel_coords: Dict[
+            int, Coords
+        ] = {}  ## maps exons to CESAR alignment coordinates
         self.spliceai_sites: Dict[int, Dict[str, Dict[int, float]]] = defaultdict(
             lambda: defaultdict(dict)
-        ) ## stores SpliceAI predictions per each exon
-        self.splice_site_nucs: Dict[int, str] = defaultdict(dict) ## stores splice site dinucleotides in the (donor, acceptor) format
-        self.introns_gained: Dict[int, Tuple[int, int]] = {} ## stores coordinates of gained introns
+        )  ## stores SpliceAI predictions per each exon
+        self.splice_site_nucs: Dict[int, str] = defaultdict(
+            dict
+        )  ## stores splice site dinucleotides in the (donor, acceptor) format
+        self.introns_gained: Dict[
+            int, Tuple[int, int]
+        ] = {}  ## stores coordinates of gained introns
 
         ## TODO: Move the code below into a separate method
         phase: int = 0
@@ -231,17 +392,23 @@ class ProcessedSegment:
             self.reference += aln_portion.reference
             self.query += aln_portion.query
             curr_aln_len: int = len(self.reference)
-            self.chains.append(aln_portion.chain) if aln_portion.chain not in self.chains else None
+            self.chains.append(
+                aln_portion.chain
+            ) if aln_portion.chain not in self.chains else None
             self.portion2coords[i] = (prev_aln_len, curr_aln_len)
             self.portion2abs_coords[i] = [
-                aln_portion.chrom, aln_portion.start, aln_portion.stop
+                aln_portion.chrom,
+                aln_portion.start,
+                aln_portion.stop,
             ]
             self.portion2strand[i] = aln_portion.strand
             self.expected_coordinates = {
-                **self.expected_coordinates, **aln_portion.exon_expected_loci
+                **self.expected_coordinates,
+                **aln_portion.exon_expected_loci,
             }
             self.exon_search_spaces = {
-                **self.exon_search_spaces, **aln_portion.exon_search_spaces
+                **self.exon_search_spaces,
+                **aln_portion.exon_search_spaces,
             }
             # self.reference_length += len(
             #     [x for x in aln_portion.reference if x.isalpha()]
@@ -273,13 +440,20 @@ class ProcessedSegment:
                         # continue
                         exon_start_encountered = True
                         rel_exon_start: int = j
-                    if query_base.upper() == 'N':
+                    if query_base.upper() == "N":
                         asmbl_gap_encountered = True
                     else:
-                        if not asssembled_start_encountered:# and (query_base.isalpha() or asmbl_gap_encountered):
+                        if (
+                            not asssembled_start_encountered
+                        ):  # and (query_base.isalpha() or asmbl_gap_encountered):
                             asssembled_start_encountered = True
                             clipped_start: int = j
-                        if asssembled_start_encountered and asmbl_gap_encountered and not coding_nuc_encountered and query_base.isalpha():
+                        if (
+                            asssembled_start_encountered
+                            and asmbl_gap_encountered
+                            and not coding_nuc_encountered
+                            and query_base.isalpha()
+                        ):
                             clipped_start: int = j
                         if asssembled_start_encountered and not asmbl_gap_encountered:
                             clipped_stop: int = j
@@ -292,30 +466,41 @@ class ProcessedSegment:
                     #         clipped_start: int = j
                     #     if clipped_start and query_base != '-':
                     #         clipped_stop: int = j
-                if base in (' ', '>') or j == curr_aln_len - 1:
+                if base in (" ", ">") or j == curr_aln_len - 1:
                     if not exon_start_encountered:
                         continue
                     rel_exon_stop: int = j + int(
                         j == curr_aln_len - 1 and curr_exon not in self.unaligned_exons
                     )
                     if rel_exon_start is None:
-                        raise RuntimeError(f'Exon start missing for exon {curr_exon}')
-                    self.rel_exon_coords[curr_exon] = Coords(rel_exon_start, rel_exon_stop)
-                    self.cesar_rel_coords[curr_exon] = Coords(rel_exon_start, rel_exon_stop)
+                        raise RuntimeError(f"Exon start missing for exon {curr_exon}")
+                    self.rel_exon_coords[curr_exon] = Coords(
+                        rel_exon_start, rel_exon_stop
+                    )
+                    self.cesar_rel_coords[curr_exon] = Coords(
+                        rel_exon_start, rel_exon_stop
+                    )
                     clipped_start = (
                         clipped_start if clipped_start is not None else rel_exon_start
                     )
                     clipped_stop = (
-                        clipped_stop if (
-                            clipped_stop is not None and clipped_stop != j - 1
-                        ) else rel_exon_stop
+                        clipped_stop
+                        if (clipped_stop is not None and clipped_stop != j - 1)
+                        else rel_exon_stop
                     )
-                    if clipped_stop - clipped_start < 3 or curr_exon in aln_portion.subexon_coordinates:
+                    if (
+                        clipped_stop - clipped_start < 3
+                        or curr_exon in aln_portion.subexon_coordinates
+                    ):
                         clipped_start, clipped_stop = rel_exon_start, rel_exon_stop
-                    self.clipped_rel_coords[curr_exon] = Coords(clipped_start, clipped_stop)
+                    self.clipped_rel_coords[curr_exon] = Coords(
+                        clipped_start, clipped_stop
+                    )
                     abs_exon_start: int = self._abs_coord(clipped_start, portion=i)
                     abs_exon_stop: int = self._abs_coord(clipped_stop, portion=i)
-                    self.abs_exon_coords[curr_exon] = Coords(abs_exon_start, abs_exon_stop)
+                    self.abs_exon_coords[curr_exon] = Coords(
+                        abs_exon_start, abs_exon_stop
+                    )
 
                     exon_start_encountered = False
                     asssembled_start_encountered = False
@@ -324,17 +509,26 @@ class ProcessedSegment:
                     curr_exon += 1
             self._update_spliceai_predictions(aln_portion, num=i)
             if aln_portion.subexon_coordinates:
-                self.introns_gained = {**self.introns_gained, **aln_portion.subexon_coordinates}
+                self.introns_gained = {
+                    **self.introns_gained,
+                    **aln_portion.subexon_coordinates,
+                }
 
-        self.exon_num: int = max(self.exon2portion) ## contains the exon number in the reference
+        self.exon_num: int = max(
+            self.exon2portion
+        )  ## contains the exon number in the reference
         # last_aligned_exon: int = max(
         #     [x for x in range(1, self.exon_num + 1) if x not in self.unaligned_exons]
         # )
         # self.last_aligned_base: int = self.rel_exon_coords[last_aligned_exon].stop
         self.last_aligned_base: int = self.rel_exon_coords[self.exon_num].stop
         self.has_spliceai_data: bool = has_spliceai_data(self.spliceai_sites)
-        self.donor_site_prob: Dict[int, float] = {x: 0.0 for x in range(1, self.exon_num + 1)}
-        self.acc_site_prob: Dict[int, float] = {x: 0.0 for x in range(1, self.exon_num + 1)}
+        self.donor_site_prob: Dict[int, float] = {
+            x: 0.0 for x in range(1, self.exon_num + 1)
+        }
+        self.acc_site_prob: Dict[int, float] = {
+            x: 0.0 for x in range(1, self.exon_num + 1)
+        }
         self.cesar_donor_support: Dict[int, bool] = {
             x: False for x in range(1, self.exon_num + 1)
         }
@@ -354,40 +548,90 @@ class ProcessedSegment:
             x: (False) for x in range(1, self.exon_num + 1)
         }
         self.intron2phase: Dict[int, int] = {x: 0 for x in range(1, self.exon_num)}
-        self.exon_evidence: Dict[int, int] = {x: 2 for x in range(1, self.exon_num + 1)} ## TEMPORARY Replace with the actual exon evidence structure
+        self.exon_evidence: Dict[int, int] = {
+            x: 2 for x in range(1, self.exon_num + 1)
+        }  ## TEMPORARY Replace with the actual exon evidence structure
 
-        self.all_ref_codons: Dict[int, str] = {} ## stores the reference triplets
-        self.all_query_codons: Dict[int, str] = {} ## stores the query triplets
-        self.ref_aa_seq: Dict[int, str] = {} ## stores translated reference sequence by position
-        self.query_aa_seq: Dict[int, str] = {} ## stores translated query sequence by position
-        self.triplet_coordinates: Dict[int, List[int]] = {} ## stores the triplet coordinates in the query
-        self.codon_coordinates: Dict[int, List[int]] = {} ## stores the reference codon coordinates in the query
-        self.triplet2ref_codon: Dict[int, int] = {} ## stores the codon alignment triplet-to-reference codon mapping
-        self.ref_codon2triplets: Dict[int, List[int]] = defaultdict(list) ## maps reference codons to corresponding aligned triplets
-        self.exon2codons: Dict[int, Tuple[int]] = {} ## stores the exon-to-marginal_codons mapping
-        self.ref_codons_to_mask: Dict[int, str] = {} ## stores real values of masked codons in the reference
-        self.query_codons_to_mask: Dict[int, str] = {} ## stores real values of masked codons in the query
-        self.query_atgs: List[int] = [] ## stores codon numbers for post-start ATG codons in the query
-        self.split_codon_struct: Dict[int, Dict[int, int]] = defaultdict(lambda: defaultdict(int)) ## stores the portion corresponding to each affected exon for each split codon
+        self.all_ref_codons: Dict[int, str] = {}  ## stores the reference triplets
+        self.all_query_codons: Dict[int, str] = {}  ## stores the query triplets
+        self.ref_aa_seq: Dict[
+            int, str
+        ] = {}  ## stores translated reference sequence by position
+        self.query_aa_seq: Dict[
+            int, str
+        ] = {}  ## stores translated query sequence by position
+        self.triplet_coordinates: Dict[
+            int, List[int]
+        ] = {}  ## stores the triplet coordinates in the query
+        self.codon_coordinates: Dict[
+            int, List[int]
+        ] = {}  ## stores the reference codon coordinates in the query
+        self.triplet2ref_codon: Dict[
+            int, int
+        ] = {}  ## stores the codon alignment triplet-to-reference codon mapping
+        self.ref_codon2triplets: Dict[int, List[int]] = defaultdict(
+            list
+        )  ## maps reference codons to corresponding aligned triplets
+        self.exon2codons: Dict[
+            int, Tuple[int]
+        ] = {}  ## stores the exon-to-marginal_codons mapping
+        self.ref_codons_to_mask: Dict[
+            int, str
+        ] = {}  ## stores real values of masked codons in the reference
+        self.query_codons_to_mask: Dict[
+            int, str
+        ] = {}  ## stores real values of masked codons in the query
+        self.query_atgs: List[
+            int
+        ] = []  ## stores codon numbers for post-start ATG codons in the query
+        self.split_codon_struct: Dict[int, Dict[int, int]] = defaultdict(
+            lambda: defaultdict(int)
+        )  ## stores the portion corresponding to each affected exon for each split codon
 
-        self.intron_deleted: Dict[int, bool] = {x: False for x in range(1, self.exon_num)} ## intron loss mapper
-        self.intersects_gap: Dict[int, bool] = {x: False for x in range(1, self.exon_num + 1)} ## assembly gap intersection status storage
-        self.mutation_list: List[Mutation] = [] ## stores the Mutation objects in the order the mutations are encountered
-        self.selenocysteine_codons: List[SelenoCysteineTuple] = [] ## stores inframe stop codons corresponding to masked codons in the reference
-        self.exon_presence: Dict[int, str] = {} ## stores exon presence statuses
-        self.exon_quality: Dict[int, str] = {} ## stores exon quality assignments
-        self.codon2mutations: Dict[int, List[int]] = defaultdict(list) ## for fast codon-to-mutation mapping
-        self.ref_codon2mutations: Dict[int, List[int]] = defaultdict(list) ## fast mapping for reference codons to mutations
-        self.exon2mutations: Dict[int, List[int]] = defaultdict(list) ## for fast exon-to-mutation mapping
-        self.deletion2mask: Dict[int, bool] = {x: False for x in range(1, self.exon_num + 1)} ## deletion masking status mapper
+        self.intron_deleted: Dict[int, bool] = {
+            x: False for x in range(1, self.exon_num)
+        }  ## intron loss mapper
+        self.intersects_gap: Dict[int, bool] = {
+            x: False for x in range(1, self.exon_num + 1)
+        }  ## assembly gap intersection status storage
+        self.mutation_list: List[
+            Mutation
+        ] = []  ## stores the Mutation objects in the order the mutations are encountered
+        self.selenocysteine_codons: List[
+            SelenoCysteineTuple
+        ] = []  ## stores inframe stop codons corresponding to masked codons in the reference
+        self.exon_presence: Dict[int, str] = {}  ## stores exon presence statuses
+        self.exon_quality: Dict[int, str] = {}  ## stores exon quality assignments
+        self.codon2mutations: Dict[int, List[int]] = defaultdict(
+            list
+        )  ## for fast codon-to-mutation mapping
+        self.ref_codon2mutations: Dict[int, List[int]] = defaultdict(
+            list
+        )  ## fast mapping for reference codons to mutations
+        self.exon2mutations: Dict[int, List[int]] = defaultdict(
+            list
+        )  ## for fast exon-to-mutation mapping
+        self.deletion2mask: Dict[int, bool] = {
+            x: False for x in range(1, self.exon_num + 1)
+        }  ## deletion masking status mapper
 
-        self.abs_nuc_ids: Dict[int, int] = {} ## stores absolute nucleotide identity values per reference exon
-        self.blosum_self_values: Dict[int, int] = {} ## stores self BLOSUM score per reference exon
-        self.blosum_diff_values: Dict[int, int] = {} ## stores BLOSUM score between reference and query exons per reference exon
-        self.nuc_ids: Dict[int, float] = {} ## contains nucleotide identity percentage values per reference exon
-        self.blosum_ids: Dict[int, float] = {} ## contains BLOSUM identity percentage values per reference exon
-        self.nuc_id: float = 0.0 ## overall nucleotide identity value
-        self.blosum_id: float = 0.0 ## overall BLOSUM identity value
+        self.abs_nuc_ids: Dict[
+            int, int
+        ] = {}  ## stores absolute nucleotide identity values per reference exon
+        self.blosum_self_values: Dict[
+            int, int
+        ] = {}  ## stores self BLOSUM score per reference exon
+        self.blosum_diff_values: Dict[
+            int, int
+        ] = {}  ## stores BLOSUM score between reference and query exons per reference exon
+        self.nuc_ids: Dict[
+            int, float
+        ] = {}  ## contains nucleotide identity percentage values per reference exon
+        self.blosum_ids: Dict[
+            int, float
+        ] = {}  ## contains BLOSUM identity percentage values per reference exon
+        self.nuc_id: float = 0.0  ## overall nucleotide identity value
+        self.blosum_id: float = 0.0  ## overall BLOSUM identity value
 
         self.frameshift_counter: int = 1
         self.nonsense_counter: int = 1
@@ -398,14 +642,24 @@ class ProcessedSegment:
         self.deleted_exon_counter: int = 1
         self.missing_exon_counter: int = 1
         self.mdel_counter: int = 1
-        self.frameshift2compensation: Dict[int, int] = {} ## for fast frameshift-to-compensation mapping
-        self.alternative_frames: Dict[int, Tuple[int, int, bool]] = {} ## for intervals between compensated frameshifts
-        self.spliceai_compensations: List[int] = [] ## for mutations numbers of compensation events involving SpliceAI correction
-        self.alt_frame_masked: Dict[int, List[int]] = {} ## to store indices of mutations masked by alternative reading frames
-        self.comps_to_delete: List[int] = [] ## a list of compensation entry indices to be removed
-        self.stop_updated: bool = False ## switches if rescue_missing_stop is set and alternative stop codon is found
+        self.frameshift2compensation: Dict[
+            int, int
+        ] = {}  ## for fast frameshift-to-compensation mapping
+        self.alternative_frames: Dict[
+            int, Tuple[int, int, bool]
+        ] = {}  ## for intervals between compensated frameshifts
+        self.spliceai_compensations: List[
+            int
+        ] = []  ## for mutations numbers of compensation events involving SpliceAI correction
+        self.alt_frame_masked: Dict[
+            int, List[int]
+        ] = {}  ## to store indices of mutations masked by alternative reading frames
+        self.comps_to_delete: List[
+            int
+        ] = []  ## a list of compensation entry indices to be removed
+        self.stop_updated: bool = False  ## switches if rescue_missing_stop is set and alternative stop codon is found
 
-        self.loss_status: str = ''
+        self.loss_status: str = ""
         self.longest_fraction_strict: float = 0.0
         self.longest_fraction_relaxed: float = 0.0
         self.total_intact_fraction: float = 0.0
@@ -415,13 +669,13 @@ class ProcessedSegment:
 
         ## here come the rest of attributes
         self.name: str = (
-            f'{self.transcript}#{",".join(self.chains)}'
+            f"{self.transcript}#{','.join(self.chains)}"
             # f'_segment{self.segment}_configuration{self.configuration}'
         )
-        self.svg: str = ''
+        self.svg: str = ""
         self.v: bool = verbose
 
-    def _to_log(self, msg: str, level: str = 'info') -> None:
+    def _to_log(self, msg: str, level: str = "info") -> None:
         """Report a line to standard output if verbosity is enabled"""
         getattr(self.logger, level)(msg) if self.v else None
 
@@ -491,12 +745,20 @@ class ProcessedSegment:
             up_strand: bool = self._exon2strand(upstream_exon)
             down_strand: bool = self._exon2strand(downstream_exon)
             ## get the coordinates for up- and downstream neighbors for the intron
-            upstream_rel_start, upstream_rel_stop = self.rel_exon_coords[upstream_exon].tuple()
+            upstream_rel_start, upstream_rel_stop = self.rel_exon_coords[
+                upstream_exon
+            ].tuple()
             # upstream_rel_start, upstream_rel_stop = self.clipped_rel_coords[upstream_exon].tuple()
-            upstream_abs_start, upstream_abs_stop = self.abs_exon_coords[upstream_exon].tuple()
-            downstream_rel_start, downstream_rel_stop = self.rel_exon_coords[downstream_exon].tuple()
+            upstream_abs_start, upstream_abs_stop = self.abs_exon_coords[
+                upstream_exon
+            ].tuple()
+            downstream_rel_start, downstream_rel_stop = self.rel_exon_coords[
+                downstream_exon
+            ].tuple()
             # downstream_rel_start, downstream_rel_stop = self.clipped_rel_coords[downstream_exon].tuple()
-            downstream_abs_start, downstream_abs_stop = self.abs_exon_coords[downstream_exon].tuple()
+            downstream_abs_start, downstream_abs_stop = self.abs_exon_coords[
+                downstream_exon
+            ].tuple()
             ## define the intron phase
             phase: int = self._get_intron_phase(intron)
             ## check both splice sites for their conservation
@@ -513,16 +775,22 @@ class ProcessedSegment:
             ## if precise intron loss has occurred, do not correct the splice sites
             if not donor_intact and not acc_intact:
                 intron_deleted, backtrack = self._check_deleted_intron(
-                    upstream_rel_stop, downstream_rel_start, upstream_exon, downstream_exon
+                    upstream_rel_stop,
+                    downstream_rel_start,
+                    upstream_exon,
+                    downstream_exon,
                 )
                 ## If ultrashort intron has been introduced instead of recording
                 ## precise intron deletion, adjust the downstream exon's start
                 if intron_deleted:
                     if backtrack and self.correct_ultrashort_introns:
                         self.rel_exon_coords[downstream_exon].start = upstream_rel_stop
-                        self.clipped_rel_coords[downstream_exon].start = upstream_rel_stop
+                        self.clipped_rel_coords[
+                            downstream_exon
+                        ].start = upstream_rel_stop
                         self.abs_exon_coords[downstream_exon].start = self._abs_coord(
-                            upstream_rel_stop, portion=down_portion#up_portion
+                            upstream_rel_stop,
+                            portion=down_portion,  # up_portion
                         )
                     self.intron_deleted[intron] = True
                     ## put a placeholder for intron's phase
@@ -532,52 +800,58 @@ class ProcessedSegment:
             ## first, define the intron's class
             ## start with the upstream neighbor's donor site
             donor_dinuc: str = self.query[
-                upstream_rel_stop:self._safe_step(upstream_rel_stop, upstream_exon, 2)
+                upstream_rel_stop : self._safe_step(upstream_rel_stop, upstream_exon, 2)
             ].lower()
             ref_donor_canonical_u2: bool = (
-                self.u12[upstream_exon]['donor'][0] == 'U2' and
-                self.u12[upstream_exon]['donor'][1] in RIGHT_SPLICE_CORR
+                self.u12[upstream_exon]["donor"][0] == "U2"
+                and self.u12[upstream_exon]["donor"][1] in RIGHT_SPLICE_CORR
             )
-            ref_donor_u12: bool = self.u12[upstream_exon]['donor'][0] == 'U12'
+            ref_donor_u12: bool = self.u12[upstream_exon]["donor"][0] == "U12"
             ref_donor_canonical_u12: bool = (
-                ref_donor_u12 and
-                self.u12[upstream_exon]['donor'][1].lower() == RIGHT_SPLICE_CORR_U12
+                ref_donor_u12
+                and self.u12[upstream_exon]["donor"][1].lower() == RIGHT_SPLICE_CORR_U12
             )
             acc_dinuc: str = self.query[
-                self._safe_step(downstream_rel_start, downstream_exon, -2):downstream_rel_start
+                self._safe_step(
+                    downstream_rel_start, downstream_exon, -2
+                ) : downstream_rel_start
             ].lower()
             ref_acc_canonical_u2: bool = (
-                self.u12[downstream_exon]['acceptor'][0] == 'U2' and
-                self.u12[downstream_exon]['acceptor'][1] in LEFT_SPLICE_CORR
+                self.u12[downstream_exon]["acceptor"][0] == "U2"
+                and self.u12[downstream_exon]["acceptor"][1] in LEFT_SPLICE_CORR
             )
-            ref_acc_u12: bool = self.u12[downstream_exon]['acceptor'][0] == 'U12'
+            ref_acc_u12: bool = self.u12[downstream_exon]["acceptor"][0] == "U12"
             ref_acc_canonical_u12: bool = (
-                ref_acc_u12 and
-                self.u12[downstream_exon]['acceptor'][1].lower() == LEFT_SPLICE_CORR_U12
+                ref_acc_u12
+                and self.u12[downstream_exon]["acceptor"][1].lower()
+                == LEFT_SPLICE_CORR_U12
             )
             is_canonical_u2: bool = ref_acc_canonical_u2 and ref_donor_canonical_u2
             is_u12: bool = ref_acc_u12 and ref_donor_u12
             is_canonical_u12: bool = ref_acc_canonical_u12 and ref_donor_canonical_u12
             is_non_canon_u12: bool = is_u12 and not is_canonical_u12
 
-            donor_sites: Dict[int, float] = self.spliceai_sites[upstream_exon]['donor']
+            donor_sites: Dict[int, float] = self.spliceai_sites[upstream_exon]["donor"]
             donor_strand: bool = self._exon2strand(upstream_exon)
-            donor_search_stop: Union[int, None] = self.exon_search_spaces[upstream_exon][
-                int(donor_strand)
-            ]
+            donor_search_stop: Union[int, None] = self.exon_search_spaces[
+                upstream_exon
+            ][int(donor_strand)]
             if donor_search_stop is not None:
                 donor_search_stop = self._rel_coord(donor_search_stop)
             init_donor_prob: float = max(
+                donor_sites.get(upstream_rel_stop + int(not up_strand), 0.0),
                 donor_sites.get(
-                    upstream_rel_stop + int(not up_strand), 0.0
+                    self._closest_non_gap(
+                        upstream_rel_stop + int(not up_strand) - 1, upstream_exon
+                    )
+                    + 1,
+                    0.0,
                 ),
-                donor_sites.get(
-                    self._closest_non_gap(upstream_rel_stop + int(not up_strand) - 1, upstream_exon) + 1, 
-                    0.0
-                )
             )
             donor_supported: bool = init_donor_prob >= self.min_splice_prob
-            valid_donor_sites: List[Tuple[int, float]] = [(upstream_rel_stop, init_donor_prob)]
+            valid_donor_sites: List[Tuple[int, float]] = [
+                (upstream_rel_stop, init_donor_prob)
+            ]
             ## splice sites are corrected if either the CESAR-found site is
             ## mutated or it is not supported by SpliceAI AND correct_all mode is set
 
@@ -589,28 +863,30 @@ class ProcessedSegment:
             ## correction mode is set to 2 or higher:
             ## correct only mutated canonical U2 donors
             donor_mode2_corr: bool = (
-                not donor_intact and ref_donor_canonical_u2 and 
-                self.correction_mode > 1
+                not donor_intact and ref_donor_canonical_u2 and self.correction_mode > 1
             )
             ## correction mode is set to 3 or higher:
             ## correct mutated and unsupported canonical U2 donors
             donor_mode3_corr: bool = (
-                not donor_supported  and ref_donor_canonical_u2 and
-                self.correction_mode > 2 #== 3
+                not donor_supported
+                and ref_donor_canonical_u2
+                and self.correction_mode > 2  # == 3
             )
             ## correction mode is set to 4 or higher:
             ## correct mutated and unsupported U2 donors as well as U12 sites
             ## deviating from the GT site
             donor_mode4_corr: bool = (
-                ref_donor_canonical_u12 and
-                not donor_supported and
-                donor_dinuc != RIGHT_SPLICE_CORR_U12 and
-                self.correction_mode > 3
+                ref_donor_canonical_u12
+                and not donor_supported
+                and donor_dinuc != RIGHT_SPLICE_CORR_U12
+                and self.correction_mode > 3
             )
             ## correction mode is set to 5:
             ## correct mutated and unsupported canonical U2 and canonical U12 donors
             donor_mode5_corr: bool = (
-                ref_donor_canonical_u12 and not donor_supported and self.correction_mode > 4
+                ref_donor_canonical_u12
+                and not donor_supported
+                and self.correction_mode > 4
             )
             ## correction mode is set to 6:
             ## correct mutated and unsupported sites for both U12 and
@@ -621,17 +897,25 @@ class ProcessedSegment:
             ## correction mode is set to 7: correct non-canonical U2 exons
             ## with no SpliceAI support on top of all the previous conditions
             donor_mode7_corr: bool = (
-                not ref_donor_u12 and not ref_donor_canonical_u2 and
-                not donor_supported and self.correction_mode > 6
+                not ref_donor_u12
+                and not ref_donor_canonical_u2
+                and not donor_supported
+                and self.correction_mode > 6
             )
             donor_needs_correction: bool = any(
                 (
-                    donor_mode2_corr, donor_mode3_corr, donor_mode4_corr,
-                    donor_mode5_corr, donor_mode6_corr, donor_mode7_corr
+                    donor_mode2_corr,
+                    donor_mode3_corr,
+                    donor_mode4_corr,
+                    donor_mode5_corr,
+                    donor_mode6_corr,
+                    donor_mode7_corr,
                     # donor_mode6_corr
                 )
             )
-            donor_frame_shift: int = self._get_frameshift(upstream_rel_start, upstream_rel_stop)
+            donor_frame_shift: int = self._get_frameshift(
+                upstream_rel_start, upstream_rel_stop
+            )
             if donor_needs_correction:
                 for donor, prob in donor_sites.items():
                     donor -= int(not up_strand)
@@ -640,15 +924,15 @@ class ProcessedSegment:
                     ## corrections leading to negative exon length are not allowed
                     if donor < upstream_rel_start:
                         self._to_log(
-                            f'Donor site at {donor} overlaps the previous exon '
-                            f'for exon {intron}'
+                            f"Donor site at {donor} overlaps the previous exon "
+                            f"for exon {intron}"
                         )
                         continue
                     ## neither are corrections leading to exon overlap
                     if (donor + MIN_INTRON_LENGTH) >= downstream_rel_start:
                         self._to_log(
-                            f'Donor site at {donor} overlaps the next exon '
-                            f'for exon {intron}'
+                            f"Donor site at {donor} overlaps the next exon "
+                            f"for exon {intron}"
                         )
                         continue
                     ## if a search space (expected locus + exon locus flank)
@@ -656,14 +940,16 @@ class ProcessedSegment:
                     ## exceed the space's downstream boundary
                     if donor_search_stop is not None and donor > donor_search_stop:
                         self._to_log(
-                            f'Donor site at {donor} exceeds the expected search space '
-                            f'for exon {intron}'
+                            f"Donor site at {donor} exceeds the expected search space "
+                            f"for exon {intron}"
                         )
                         continue
                     ## corrections must preserve the exon's reading frame
-                    if not self._site_is_inframe(upstream_rel_stop, donor, donor_frame_shift, donor=True):
+                    if not self._site_is_inframe(
+                        upstream_rel_stop, donor, donor_frame_shift, donor=True
+                    ):
                         self._to_log(
-                            f'Donor site at {donor} with probability {prob} is out of frame for exon {intron}'
+                            f"Donor site at {donor} with probability {prob} is out of frame for exon {intron}"
                         )
                         continue
                     ## and should not introduce inframe stop codons
@@ -671,25 +957,26 @@ class ProcessedSegment:
                         upstream_rel_stop - phase, donor - phase
                     ):
                         self._to_log(
-                            f'Donor site at {donor} introduces a nonsense '
-                            f'mutation for exon {intron}'
+                            f"Donor site at {donor} introduces a nonsense "
+                            f"mutation for exon {intron}"
                         )
                         continue
                     if (
-                        not donor_supported and init_donor_prob > 0 and
-                        init_donor_prob + self.prob_margin > prob
+                        not donor_supported
+                        and init_donor_prob > 0
+                        and init_donor_prob + self.prob_margin > prob
                     ):
                         self._to_log(
-                            f'Donor site at {donor} does not exceed initial '
-                            f'probability {init_donor_prob} by the margin of '
-                            f'{self.prob_margin}'
+                            f"Donor site at {donor} does not exceed initial "
+                            f"probability {init_donor_prob} by the margin of "
+                            f"{self.prob_margin}"
                         )
                         continue
                     if upstream_exon in self.introns_gained:
                         if donor <= self.introns_gained[upstream_exon][-1][0]:
                             self._to_log(
-                                f'Donor site at {donor} rules out query-specific introns '
-                                'defined by SpliceAI'
+                                f"Donor site at {donor} rules out query-specific introns "
+                                "defined by SpliceAI"
                             )
                             continue
                     ## once all the conditions are met, add the splice site pair
@@ -698,40 +985,44 @@ class ProcessedSegment:
             ## sort the splice sites by SpliceAI probability in the inverse order
             valid_donor_sites.sort(key=lambda x: -x[1])
             ## now do the same for the downstream exon's acceptor site
-            acc_sites: Dict[int, float] = self.spliceai_sites[downstream_exon]['acceptor']
+            acc_sites: Dict[int, float] = self.spliceai_sites[downstream_exon][
+                "acceptor"
+            ]
             init_acc_prob: float = max(
                 acc_sites.get(
-                    self._closest_non_gap(downstream_rel_start - int(down_strand), downstream_exon),
-                    0.0
+                    self._closest_non_gap(
+                        downstream_rel_start - int(down_strand), downstream_exon
+                    ),
+                    0.0,
                 ),
-                acc_sites.get(downstream_rel_start - int(down_strand), 0.0)
+                acc_sites.get(downstream_rel_start - int(down_strand), 0.0),
             )
             acc_supported: bool = init_acc_prob >= self.min_splice_prob
             acc_strand: bool = self._exon2strand(downstream_exon)
-            acc_search_stop: Union[int, None] = self.exon_search_spaces[downstream_exon][
-                int(not acc_strand)
-            ]
+            acc_search_stop: Union[int, None] = self.exon_search_spaces[
+                downstream_exon
+            ][int(not acc_strand)]
 
             ## correction mode is set to 2 or higher:
             ## correct only mutated canonical U2 donors
             acc_mode2_corr: bool = (
-                not acc_intact and ref_acc_canonical_u2 and
-                self.correction_mode > 1
+                not acc_intact and ref_acc_canonical_u2 and self.correction_mode > 1
             )
             ## correction mode is set to 3 or higher:
             ## correct mutated and unsupported canonical U2 donors
             acc_mode3_corr: bool = (
-                ref_acc_canonical_u2 and not acc_supported and
-                self.correction_mode > 2 #== 3
+                ref_acc_canonical_u2
+                and not acc_supported
+                and self.correction_mode > 2  # == 3
             )
             ## correction mode is set to 4 or higher:
             ## correct mutated and unsupported U2 donors as well as U12 sites
             ## deviating from the GT site
             acc_mode4_corr: bool = (
-                ref_acc_canonical_u12 and
-                not acc_supported and
-                acc_dinuc.lower() != LEFT_SPLICE_CORR_U12 and
-                self.correction_mode > 3
+                ref_acc_canonical_u12
+                and not acc_supported
+                and acc_dinuc.lower() != LEFT_SPLICE_CORR_U12
+                and self.correction_mode > 3
             )
             ## correction mode is set to 5 or higher:
             ## correct mutated and unsupported sites for both U12 and
@@ -748,21 +1039,31 @@ class ProcessedSegment:
             ## correction mode is set to 7: correct non-canonical U2 exons
             ## with no SpliceAI support on top of all the previous conditions
             acc_mode7_corr: bool = (
-                not is_u12 and not ref_acc_canonical_u2 and
-                not acc_supported and self.correction_mode > 6
+                not is_u12
+                and not ref_acc_canonical_u2
+                and not acc_supported
+                and self.correction_mode > 6
             )
             acc_needs_correction: bool = any(
                 (
-                    acc_mode2_corr, acc_mode3_corr, acc_mode4_corr,
-                    acc_mode5_corr, acc_mode6_corr, acc_mode7_corr
+                    acc_mode2_corr,
+                    acc_mode3_corr,
+                    acc_mode4_corr,
+                    acc_mode5_corr,
+                    acc_mode6_corr,
+                    acc_mode7_corr,
                     # acc_mode6_corr
                 )
             )
 
             if acc_search_stop is not None:
                 acc_search_stop = self._rel_coord(acc_search_stop)
-            valid_acc_sites: List[Tuple[int, float]] = [(downstream_rel_start, init_acc_prob)]
-            acc_frame_shift: int = self._get_frameshift(downstream_rel_start, downstream_rel_stop)
+            valid_acc_sites: List[Tuple[int, float]] = [
+                (downstream_rel_start, init_acc_prob)
+            ]
+            acc_frame_shift: int = self._get_frameshift(
+                downstream_rel_start, downstream_rel_stop
+            )
             if acc_needs_correction:
                 for acc, prob in acc_sites.items():
                     acc += int(down_strand)
@@ -770,57 +1071,60 @@ class ProcessedSegment:
                         continue
                     if acc > downstream_rel_stop:
                         self._to_log(
-                            (
-                                'Acceptor site at %i overlaps the next exon '
-                                'for exon %i'
-                            ) % (acc, intron + 1)
+                            ("Acceptor site at %i overlaps the next exon for exon %i")
+                            % (acc, intron + 1)
                         )
                         continue
                     if (acc - MIN_INTRON_LENGTH) <= upstream_rel_stop:
                         self._to_log(
                             (
-                                'Acceptor site at %i overlaps the previous exon '
-                                'for exon %i'
-                            ) % (acc, intron + 1)
+                                "Acceptor site at %i overlaps the previous exon "
+                                "for exon %i"
+                            )
+                            % (acc, intron + 1)
                         )
                         continue
                     if acc_search_stop is not None and acc < acc_search_stop:
                         self._to_log(
                             (
-                                'Acceptor site at %i exceeds the expected search '
-                                'space for exon %i'
-                            ) % (acc, intron + 1)
+                                "Acceptor site at %i exceeds the expected search "
+                                "space for exon %i"
+                            )
+                            % (acc, intron + 1)
                         )
                         continue
-                    if not self._site_is_inframe(downstream_rel_start, acc, acc_frame_shift, donor=False):
+                    if not self._site_is_inframe(
+                        downstream_rel_start, acc, acc_frame_shift, donor=False
+                    ):
                         self._to_log(
-                            f'Acceptor site at {acc} with probability {prob} is out of frame '
-                            f'for exon {intron+1}'
+                            f"Acceptor site at {acc} with probability {prob} is out of frame "
+                            f"for exon {intron + 1}"
                         )
                         continue
                     if not self._nonsense_free_correction(
                         acc + (3 - phase) % 3, downstream_rel_start + (3 - phase) % 3
                     ):
                         self._to_log(
-                            f'Acceptor site at {acc} introduces a nonsense '
-                            f'mutation for exon {intron+1}'
+                            f"Acceptor site at {acc} introduces a nonsense "
+                            f"mutation for exon {intron + 1}"
                         )
                         continue
                     if (
-                        not acc_supported and init_acc_prob > 0 and
-                        init_acc_prob + self.prob_margin > prob
+                        not acc_supported
+                        and init_acc_prob > 0
+                        and init_acc_prob + self.prob_margin > prob
                     ):
                         self._to_log(
-                            f'Acceptor site at {acc} does not exceed initial '
-                            f'probability {init_acc_prob} by the margin of '
-                            f'{self.prob_margin}'
+                            f"Acceptor site at {acc} does not exceed initial "
+                            f"probability {init_acc_prob} by the margin of "
+                            f"{self.prob_margin}"
                         )
                         continue
                     if downstream_exon in self.introns_gained:
                         if acc >= self.introns_gained[downstream_exon][0][1]:
                             self._to_log(
-                                f'Acceptor site at {acc} rules out query-specific introns '
-                                'defined by SpliceAI'
+                                f"Acceptor site at {acc} rules out query-specific introns "
+                                "defined by SpliceAI"
                             )
                             continue
                     valid_acc_sites.append((acc, prob))
@@ -828,41 +1132,41 @@ class ProcessedSegment:
             ## now, get all the splice site combinations
             intron_combinations: List[Tuple[Tuple[int, float]]] = sorted(
                 ((x, y) for x in valid_donor_sites for y in valid_acc_sites),
-                key=lambda x: (-x[0][1], -x[1][1])
+                key=lambda x: (-x[0][1], -x[1][1]),
             )
             ## by default, assign the CESAR-predicted site coordinates to the sites of choice
             best_donor: int = upstream_rel_stop
             best_acc: int = downstream_rel_start
             best_donor_prob: float = init_donor_prob
             best_acc_prob: float = init_acc_prob
-            for ((donor, donor_prob), (acc, acc_prob)) in intron_combinations:
+            for (donor, donor_prob), (acc, acc_prob) in intron_combinations:
                 abs_donor: int = self._abs_coord(donor, portion=up_portion)
                 abs_acc: int = self._abs_coord(acc, portion=down_portion)
                 if donor >= acc:
                     continue
-                if getattr(
-                    abs_donor, '__le__' if up_strand else '__ge__'
-                )(upstream_abs_start if up_strand else upstream_abs_stop):
+                if getattr(abs_donor, "__le__" if up_strand else "__ge__")(
+                    upstream_abs_start if up_strand else upstream_abs_stop
+                ):
                     self._to_log(
-                        f'Donor {donor} with probability {donor_prob} lies before the start of exon {upstream_exon}'
+                        f"Donor {donor} with probability {donor_prob} lies before the start of exon {upstream_exon}"
                     )
                     continue
-                if getattr(
-                    abs_acc, '__ge__' if down_strand else '__le__'
-                )(downstream_abs_stop if down_strand else downstream_abs_start):
+                if getattr(abs_acc, "__ge__" if down_strand else "__le__")(
+                    downstream_abs_stop if down_strand else downstream_abs_start
+                ):
                     self._to_log(
-                        f'Acceptor {acc} with probability {acc_prob} '
-                        f'lies after the end of exon {downstream_exon}'
+                        f"Acceptor {acc} with probability {acc_prob} "
+                        f"lies after the end of exon {downstream_exon}"
                     )
                     continue
                 if self._alternative_split_contains_stop(donor, acc, phase):
                     self._to_log(
-                        f'Alternative intron combination {((donor, donor_prob), (acc, acc_prob))} introduces a stop codon'
+                        f"Alternative intron combination {((donor, donor_prob), (acc, acc_prob))} introduces a stop codon"
                     )
                     continue
                 if self._zero_length_exon_introduced(intron, donor, acc):
                     self._to_log(
-                        f'Alternative intron combination {((donor, donor_prob), (acc, acc_prob))} results in a zero nucleotide exon'
+                        f"Alternative intron combination {((donor, donor_prob), (acc, acc_prob))} results in a zero nucleotide exon"
                     )
                     continue
                 best_donor = donor
@@ -882,8 +1186,12 @@ class ProcessedSegment:
             acc_spliceai_support: bool = best_acc_prob > self.min_splice_prob
             self.spliceai_donor_support[upstream_exon] = donor_spliceai_support
             self.spliceai_acc_support[downstream_exon] = acc_spliceai_support
-            self.corrected_frame[upstream_exon] |= (not donor_cesar_support and bool(donor_frame_shift))
-            self.corrected_frame[downstream_exon] |= (not acc_cesar_support and bool(acc_frame_shift))
+            self.corrected_frame[upstream_exon] |= not donor_cesar_support and bool(
+                donor_frame_shift
+            )
+            self.corrected_frame[downstream_exon] |= not acc_cesar_support and bool(
+                acc_frame_shift
+            )
 
             ## if neither of the sites were corrected and the original intron was
             ## too short, correct the intron and proceed
@@ -891,13 +1199,22 @@ class ProcessedSegment:
                 best_donor, best_acc, upstream_exon, downstream_exon
             )
             intron_uncorrected: bool = upd_intron_len == init_intron_len
-            intron_too_short: bool = init_intron_len is not None and init_intron_len < MAX_RETAINED_INTRON_LEN
+            intron_too_short: bool = (
+                init_intron_len is not None
+                and init_intron_len < MAX_RETAINED_INTRON_LEN
+            )
             _istart, _istop = self.rel_exon_coords[upstream_exon].tuple()
 
-            if intron_uncorrected and intron_too_short and self.correct_ultrashort_introns:
+            if (
+                intron_uncorrected
+                and intron_too_short
+                and self.correct_ultrashort_introns
+            ):
                 self.rel_exon_coords[downstream_exon].start = upstream_rel_stop
                 self.clipped_rel_coords[downstream_exon].start = upstream_rel_stop
-                self.abs_exon_coords[downstream_exon].start = self._abs_coord(upstream_rel_stop, portion=up_portion)
+                self.abs_exon_coords[downstream_exon].start = self._abs_coord(
+                    upstream_rel_stop, portion=up_portion
+                )
                 self.intron_deleted[intron] = True
                 ## put a placeholder for intron's phase
                 self.intron2phase[intron] = -1
@@ -905,20 +1222,28 @@ class ProcessedSegment:
 
             ## update the intron boundaries
             self._to_log(
-                f'Best coordinates for intron {intron} are: donor={best_donor} ({best_donor_prob}), acceptor={best_acc} ({best_acc_prob})'
+                f"Best coordinates for intron {intron} are: donor={best_donor} ({best_donor_prob}), acceptor={best_acc} ({best_acc_prob})"
             )
-            if self._abs_coord(best_donor, portion=up_portion) == (upstream_abs_stop if up_strand else upstream_abs_start):
+            if self._abs_coord(best_donor, portion=up_portion) == (
+                upstream_abs_stop if up_strand else upstream_abs_start
+            ):
                 best_donor = upstream_rel_stop
             self.rel_exon_coords[upstream_exon].stop = best_donor
             if best_donor != upstream_rel_stop:
-                self.clipped_rel_coords[upstream_exon].stop = best_donor ## sic!
-            self.abs_exon_coords[upstream_exon].stop = self._abs_coord(best_donor, portion=up_portion)
-            if self._abs_coord(best_acc, portion=down_portion) == (downstream_abs_start if down_strand else downstream_abs_stop):
+                self.clipped_rel_coords[upstream_exon].stop = best_donor  ## sic!
+            self.abs_exon_coords[upstream_exon].stop = self._abs_coord(
+                best_donor, portion=up_portion
+            )
+            if self._abs_coord(best_acc, portion=down_portion) == (
+                downstream_abs_start if down_strand else downstream_abs_stop
+            ):
                 best_acc = downstream_rel_start
             self.rel_exon_coords[downstream_exon].start = best_acc
             if best_acc != downstream_rel_start:
                 self.clipped_rel_coords[downstream_exon].start = best_acc
-            self.abs_exon_coords[downstream_exon].start = self._abs_coord(best_acc, portion=down_portion)
+            self.abs_exon_coords[downstream_exon].start = self._abs_coord(
+                best_acc, portion=down_portion
+            )
             ## get the intron's phase
             self.intron2phase[intron] = self._get_intron_phase(intron)
 
@@ -934,8 +1259,8 @@ class ProcessedSegment:
         Processes the aligned sequences, inferring the alignment structure
         as well as exon properties.
         """
-        ref_codon: str = ''
-        query_codon: str = ''
+        ref_codon: str = ""
+        query_codon: str = ""
         codon_coords: List[int] = []
         triplet_num: int = 1
         ref_codon_num: int = 1
@@ -944,10 +1269,10 @@ class ProcessedSegment:
         del_length: int = 0
         asmbl_gap: int = 0
         split_portion: int = 0
-        initial_ref_stop: str = ''
+        initial_ref_stop: str = ""
         codon_spliceai_diff: bool = False
         for exon in range(1, self.exon_num + 1):
-            self._to_log(f'Processing exon {exon}')
+            self._to_log(f"Processing exon {exon}")
             portion: int = self.exon2portion[exon]
             aln_len: int = 0
             abs_nuc_id: int = 0
@@ -976,48 +1301,57 @@ class ProcessedSegment:
             clipped_stop_updated: bool = False
             if exon in self.introns_gained:
                 intron_intervals: List[Tuple[int, int]] = [
-                    (self.introns_gained[exon][x-1][1], self.introns_gained[exon][x][0])
+                    (
+                        self.introns_gained[exon][x - 1][1],
+                        self.introns_gained[exon][x][0],
+                    )
                     for x in range(1, len(self.introns_gained[exon]))
                 ]
             else:
                 intron_intervals: List[Tuple[int, int]] = []
             ## check acceptor site
             _ = self._check_splice_site(exon, adj_start, acc=True, check_only=False)
-            self._to_log(f'{exon=}, {cesar_start=}, {cesar_stop=}, {adj_start=}, {adj_stop=}, {clipped_start=}, {clipped_stop=}, {self.abs_exon_coords[exon]=}')
+            self._to_log(
+                f"{exon=}, {cesar_start=}, {cesar_stop=}, {adj_start=}, {adj_stop=}, {clipped_start=}, {clipped_stop=}, {self.abs_exon_coords[exon]=}"
+            )
             for i in range(start, stop):
                 n1: str = self.reference[i]
                 n2: str = self.query[i]
                 is_unclipped: bool = exon_is_unclipped or (
-                    clipped_start <= i <= clipped_stop and n2.upper() != 'N'
+                    clipped_start <= i <= clipped_stop and n2.upper() != "N"
                 )
                 contains_term_ns |= not is_unclipped
                 intronic: bool = any(x[0] <= i < x[1] for x in intron_intervals)
                 if intronic:
-                    n2 = '-'
+                    n2 = "-"
                 else:
                     aln_len += 1
-                spliceai_diff: bool = (
-                    (i >= cesar_start and i < adj_start) or
-                    (i < cesar_stop and i >= adj_stop)
+                spliceai_diff: bool = (i >= cesar_start and i < adj_start) or (
+                    i < cesar_stop and i >= adj_stop
                 )
                 codon_spliceai_diff |= spliceai_diff
-                if is_symbol(n1) and (n2.isupper() or n2 == '-') and not contains_term_ns and not intronic:
+                if (
+                    is_symbol(n1)
+                    and (n2.isupper() or n2 == "-")
+                    and not contains_term_ns
+                    and not intronic
+                ):
                     abs_nuc_id += int(n1.upper() == n2.upper())
                 if n1.isalpha():
                     ref_exon_len += 1
                 else:
-                    n1 = '-'
+                    n1 = "-"
                 if n1.islower():
                     split_portion += 1
                 elif split_portion and n1.isalpha():
                     split_portion = 0
                 if spliceai_diff:
-                    n2 = '-'
+                    n2 = "-"
                 n1 = n1.upper()
-                n2 = n2.upper() ## redundant
-                if n2 != '-':
+                n2 = n2.upper()  ## redundant
+                if n2 != "-":
                     codon_coords.append(self._abs_coord(i, portion=portion))
-                if n2 == 'N':
+                if n2 == "N":
                     asmbl_gap += 1
                 else:
                     asmbl_gap = 0
@@ -1033,7 +1367,7 @@ class ProcessedSegment:
                 ## clipping and contains both ambiguous and defined codons,
                 ## updated the absolute coordinates
                 if contains_term_ns:
-                    if not abs_nuc_id and (n2.upper() != 'N'):
+                    if not abs_nuc_id and (n2.upper() != "N"):
                         adj_clipped_start: int = i + 1
                         self.abs_exon_coords[exon].start = self._abs_coord(
                             adj_clipped_start, portion=portion
@@ -1054,31 +1388,35 @@ class ProcessedSegment:
                     ## if stop codon has been shifted, record the original stop codon
                     ## but do not compare the resulting reciprocal gap codons
                     if (
-                        cesar_stop - 1 in codon_coords and ref_codon in STOPS and
-                        query_codon == GAP_CODON
+                        cesar_stop - 1 in codon_coords
+                        and ref_codon in STOPS
+                        and query_codon == GAP_CODON
                     ):
                         initial_ref_stop: int = ref_codon
                         continue
                     elif (
-                        adj_stop - 1 in codon_coords and ref_codon == GAP_CODON and
-                        query_codon in STOPS
+                        adj_stop - 1 in codon_coords
+                        and ref_codon == GAP_CODON
+                        and query_codon in STOPS
                     ):
                         ref_codon = ref_codon[:-3] + initial_ref_stop
                 codon_start: int = 0
                 subcodon_len_sum: int = 0
                 ## process the codon into individual triplets
-                for sub_num, (r, q) in enumerate(process_codon_pair(ref_codon, query_codon)):
-                    if '|' in r:
-                        r_, r = r.split('|')
+                for sub_num, (r, q) in enumerate(
+                    process_codon_pair(ref_codon, query_codon)
+                ):
+                    if "|" in r:
+                        r_, r = r.split("|")
                         self.ref_codons_to_mask[triplet_num] = r
-                        q_, q = q.split('|')
+                        q_, q = q.split("|")
                         self.query_codons_to_mask[triplet_num] = q
-                        codon_extent: int = len(q.replace('-', ''))
+                        codon_extent: int = len(q.replace("-", ""))
                     else:
                         ## check_codon will automatically mask
                         ## any stop codon as XXX_CODON, so the last codon
                         ## should be spared from checking
-                        is_last: bool =  i >= self.last_aligned_base
+                        is_last: bool = i >= self.last_aligned_base
                         ref_is_stop: bool = r in STOPS
                         query_is_stop: bool = q in STOPS
                         regular_stop_found: bool = is_last and ref_is_stop
@@ -1090,15 +1428,15 @@ class ProcessedSegment:
                             if q != q_:
                                 self.query_codons_to_mask[triplet_num] = q
                             # r, q = r_, q_
-                            codon_extent: int = len(q.replace('-', ''))
+                            codon_extent: int = len(q.replace("-", ""))
                     subcodon_coords: List[int] = codon_coords[
-                        codon_start:codon_start + codon_extent
+                        codon_start : codon_start + codon_extent
                     ]
                     codon_start = codon_start + codon_extent
                     if not len(subcodon_coords):
                         subcodon_coords = [
                             self._abs_coord(i - len(query_codon) + 1, portion=portion),
-                            self._abs_coord(i + 1, portion=portion)
+                            self._abs_coord(i + 1, portion=portion),
                         ]
                         codon_coords.extend(subcodon_coords)
                     self.triplet_coordinates[triplet_num] = subcodon_coords
@@ -1120,23 +1458,35 @@ class ProcessedSegment:
                         self._check_for_nonsense_mutation(triplet_num)
                     ## then, check for big indel mutations
                     if r == GAP_CODON:
-                        ins_length += bool(not codon_spliceai_diff)#1 if not codon_spliceai_diff else 0
+                        ins_length += bool(
+                            not codon_spliceai_diff
+                        )  # 1 if not codon_spliceai_diff else 0
                     else:
                         if ins_length * 3 > BIG_INDEL_SIZE:
-                            self._add_indel_mutation(triplet_num, ins_length, insertion=True)
+                            self._add_indel_mutation(
+                                triplet_num, ins_length, insertion=True
+                            )
                         ins_length = 0
                     if q == GAP_CODON:
-                        del_length +=  bool(not codon_spliceai_diff)#1 if codon_spliceai_diff else 0
+                        del_length += bool(
+                            not codon_spliceai_diff
+                        )  # 1 if codon_spliceai_diff else 0
                     else:
                         if del_length * 3 > BIG_INDEL_SIZE:
-                            self._add_indel_mutation(triplet_num, del_length, insertion=False)
+                            self._add_indel_mutation(
+                                triplet_num, del_length, insertion=False
+                            )
                         del_length = 0
-                    if exon == self.exon_num and i >= (self.last_aligned_base - 1) and not self.stop_updated:
+                    if (
+                        exon == self.exon_num
+                        and i >= (self.last_aligned_base - 1)
+                        and not self.stop_updated
+                    ):
                         self._check_for_stop_loss()
                     triplet_num += 1
                 for ra, qa in process_and_translate(ref_codon, query_codon):
                     if not (split_portion or contains_term_ns):
-                    # if not contains_term_ns:
+                        # if not contains_term_ns:
                         self_score: int = get_blosum_score(ra, ra, self.matrix)
                         if blosum_self is None:
                             blosum_self = self_score
@@ -1154,28 +1504,31 @@ class ProcessedSegment:
                 codon_spliceai_diff = False
                 self.codon_coordinates[ref_codon_num] = codon_coords
                 ref_codon_num += bool(ref_codon != GAP_CODON)
-                ref_codon = ''
-                query_codon = ''
+                ref_codon = ""
+                query_codon = ""
                 codon_coords = []
                 contains_term_ns = False
                 clipped_start_updated, clipped_stop_updated = False, False
             ## record the split portion of the last codon
             if split_portion:
                 latent_triplets: int = floor(len(ref_codon) / 3)
-                split_triplet: int = triplet_num + (latent_triplets if latent_triplets > 1 else 0 )
+                split_triplet: int = triplet_num + (
+                    latent_triplets if latent_triplets > 1 else 0
+                )
                 if ref_exon_len == 1:
                     ## codon can be split between three exons only if mid exon is 1 bp long
                     self.split_codon_struct[split_triplet][exon] = 1
-                    self.split_codon_struct[split_triplet][exon+1] = 1
+                    self.split_codon_struct[split_triplet][exon + 1] = 1
                 else:
                     self.split_codon_struct[split_triplet][exon] = split_portion
-                    self.split_codon_struct[split_triplet][exon+1] = 3 - split_portion
+                    self.split_codon_struct[split_triplet][exon + 1] = 3 - split_portion
             self.aln_lengths[exon] = aln_len
             self.abs_nuc_ids[exon] = abs_nuc_id
             self.blosum_self_values[exon] = blosum_self
             self.blosum_diff_values[exon] = blosum_diff
             self.exon2codons[exon] = (
-                first_codon, split_triplet if split_portion else triplet_num
+                first_codon,
+                split_triplet if split_portion else triplet_num,
             )
             self.exon2ref_codons[exon] = (first_ref_codon, ref_codon_num)
             self.ref_exon_lengths[exon] = ref_exon_len
@@ -1191,7 +1544,7 @@ class ProcessedSegment:
             nid: int = (_nid / _aln_len) * 100
             self.nuc_ids[exon] = nid
             _blosum_self: float = self.blosum_self_values[exon]
-            _blosum_diff: float  = self.blosum_diff_values[exon]
+            _blosum_diff: float = self.blosum_diff_values[exon]
             if _blosum_self is None or _blosum_diff is None:
                 if exon in self.unaligned_exons:
                     _blosum_self = 0.0
@@ -1201,17 +1554,17 @@ class ProcessedSegment:
                     first_codon: int = ref_codons[0]
                     first_triplet: int = min(self.ref_codon2triplets[first_codon])
                     last_triplet: int = max(self.ref_codon2triplets[first_codon])
-                    ref_only_codon: int = ''.join(
-                        self.ref_codons_to_mask.get(
-                            x, self.all_ref_codons[x]
-                        ) for x in range(first_triplet, last_triplet + 1)
+                    ref_only_codon: int = "".join(
+                        self.ref_codons_to_mask.get(x, self.all_ref_codons[x])
+                        for x in range(first_triplet, last_triplet + 1)
                     )
-                    query_only_codon: int = ''.join(
-                        self.query_codons_to_mask.get(
-                            x, self.all_query_codons[x]
-                        ) for x in range(first_triplet, last_triplet + 1)
+                    query_only_codon: int = "".join(
+                        self.query_codons_to_mask.get(x, self.all_query_codons[x])
+                        for x in range(first_triplet, last_triplet + 1)
                     )
-                    ref_aa, query_aa = next(process_and_translate(ref_only_codon, query_only_codon)) ## NEEDS TESTING
+                    ref_aa, query_aa = next(
+                        process_and_translate(ref_only_codon, query_only_codon)
+                    )  ## NEEDS TESTING
                     _blosum_self = get_blosum_score(ref_aa, ref_aa, self.matrix)
                     _blosum_diff = get_blosum_score(ref_aa, query_aa, self.matrix)
                 self.blosum_self_values[exon] = _blosum_self
@@ -1234,87 +1587,113 @@ class ProcessedSegment:
         COMPENSATION mutation are not masked but the affected frameshifts are.
         """
         frameshifts: List[Tuple[int, Mutation]] = [
-            (x, y) for x, y in enumerate(self.mutation_list) if
-            y.mutation_class in (FS_INS, FS_DEL)
+            (x, y)
+            for x, y in enumerate(self.mutation_list)
+            if y.mutation_class in (FS_INS, FS_DEL)
         ]
-        if len(frameshifts) < 2: 
-            ## a solitary frameshift has nothing to compensate 
+        if len(frameshifts) < 2:
+            ## a solitary frameshift has nothing to compensate
             ## or to be compensated by
             return
         ## for each mutation other than the last one, check if it is compensated
-        already_compensated: List[int] = [] ## to store frameshifts already compensated
-        alt_frame_start: Union[int, None] = None ## first affected codon to measure fixed frame from
+        already_compensated: List[int] = []  ## to store frameshifts already compensated
+        alt_frame_start: Union[int, None] = (
+            None  ## first affected codon to measure fixed frame from
+        )
         for inum, (_, init_mut) in enumerate(frameshifts[:-1]):
-            if inum in already_compensated: 
-                ## compensated by the previous mutation, 
+            if inum in already_compensated:
+                ## compensated by the previous mutation,
                 ## no need to compensate anew
                 continue
-            if isinstance(init_mut.exon, int) and self.exon_presence[init_mut.exon] != 'I': 
-                ## do not account for mutations 
+            if (
+                isinstance(init_mut.exon, int)
+                and self.exon_presence[init_mut.exon] != "I"
+            ):
+                ## do not account for mutations
                 ## in the non-present exons
                 continue
-            elif any(self.exon_presence[int(x)] != 'I' for x in str(init_mut.exon).split('_')):
+            elif any(
+                self.exon_presence[int(x)] != "I" for x in str(init_mut.exon).split("_")
+            ):
                 continue
             fs_size: int = int(init_mut.description)
             fs_group: List[int] = [inum]
             init_exon: int = init_mut.exon
             init_exon_corrected: bool = self._exon_was_corrected(init_exon)
             ## for each succeeding mutation, check if it compensates the current group
-            for jnum, (_, other_mut) in enumerate(frameshifts[inum+1:], inum+1):
+            for jnum, (_, other_mut) in enumerate(frameshifts[inum + 1 :], inum + 1):
                 if jnum in already_compensated:
                     continue
-                if isinstance(other_mut.exon, int) and self.exon_presence[other_mut.exon] != 'I':
+                if (
+                    isinstance(other_mut.exon, int)
+                    and self.exon_presence[other_mut.exon] != "I"
+                ):
                     continue
-                elif any(self.exon_presence[int(x)] != 'I' for x in str(other_mut.exon).split('_')):
+                elif any(
+                    self.exon_presence[int(x)] != "I"
+                    for x in str(other_mut.exon).split("_")
+                ):
                     continue
                 other_exon: int = other_mut.exon
                 other_exon_corrected: bool = self._exon_was_corrected(other_exon)
-                ## frameshifts already resolved by SpliceAI correction 
+                ## frameshifts already resolved by SpliceAI correction
                 ## cannot compensate frameshifts in other exons
-                same_correction_event: bool = self._mutations_in_same_query_codon(init_mut, other_mut)
+                same_correction_event: bool = self._mutations_in_same_query_codon(
+                    init_mut, other_mut
+                )
                 spliceai_corr_migrated: bool = self._comp_moved_to_split_codon(
                     init_mut, other_mut
                 ) or self._comp_moved_to_next_exon(init_mut, other_mut)
-                if (init_exon_corrected or other_exon_corrected) and init_mut.exon != other_mut.exon:
+                if (
+                    init_exon_corrected or other_exon_corrected
+                ) and init_mut.exon != other_mut.exon:
                     if not (same_correction_event or spliceai_corr_migrated):
                         continue
                 fs_size += int(other_mut.description)
                 fs_group.append(jnum)
-                if not (fs_size % 3): 
+                if not (fs_size % 3):
                     ## the sum of frameshifts divides by 3 with no remainder
                     ## define which codons are affected by the frameshift
                     if alt_frame_start is None:
-                        first_affected: int = self._next_complete_codon(frameshifts[fs_group[0]][1].codon, prev=True)
+                        first_affected: int = self._next_complete_codon(
+                            frameshifts[fs_group[0]][1].codon, prev=True
+                        )
                     else:
                         first_affected = alt_frame_start
-                    last_affected: int = self._next_complete_codon(frameshifts[fs_group[-1]][1].codon, prev=False)
+                    last_affected: int = self._next_complete_codon(
+                        frameshifts[fs_group[-1]][1].codon, prev=False
+                    )
                     alt_ref_start: int = self.triplet2ref_codon[first_affected]
                     alt_ref_stop: int = self.triplet2ref_codon[last_affected]
                     alt_start: int = min(self.ref_codon2triplets[alt_ref_start])
                     alt_stop: int = max(self.ref_codon2triplets[alt_ref_stop])
                     ## gather the affected codons, unmask if necessary
                     affected_codons: List[str] = [
-                        self.query_codons_to_mask.get(
-                            x, self.all_query_codons[x]
-                        ) for x in range(alt_start, alt_stop)
-                        if any(self.exon_presence[y] == 'I' for y in self._codon2exon(x))
+                        self.query_codons_to_mask.get(x, self.all_query_codons[x])
+                        for x in range(alt_start, alt_stop)
+                        if any(
+                            self.exon_presence[y] == "I" for y in self._codon2exon(x)
+                        )
                     ]
                     ## concatenate the codons, remove deletion symbols and split the result into triplets
-                    alt_frame: List[str] = parts(''.join(affected_codons).replace('-', ''), 3)
+                    alt_frame: List[str] = parts(
+                        "".join(affected_codons).replace("-", ""), 3
+                    )
                     ## check the resulting frame for nonsense mutations
                     spliceai_mitigated: bool = any(
-                            self._in_modified_seq(
-                                frameshifts[x][1].exon, frameshifts[x][1].codon
-                            ) for x in fs_group
+                        self._in_modified_seq(
+                            frameshifts[x][1].exon, frameshifts[x][1].codon
                         )
-                    if not STOPS.intersection(alt_frame) or spliceai_mitigated: 
+                        for x in fs_group
+                    )
+                    if not STOPS.intersection(alt_frame) or spliceai_mitigated:
                         ## create a mutation object and add it to the global pool
                         start_id: str = frameshifts[fs_group[0]][1].mutation_id
-                        start_num: str = start_id.split('_')[1]
+                        start_num: str = start_id.split("_")[1]
                         end_id: str = frameshifts[fs_group[-1]][1].mutation_id
-                        end_num: str = end_id.split('_')[1]
-                        description: str = f'FS_{start_num}-{end_num}'
-                        mut_id: str = f'C_{self.compensation_counter}'
+                        end_num: str = end_id.split("_")[1]
+                        description: str = f"FS_{start_num}-{end_num}"
+                        mut_id: str = f"C_{self.compensation_counter}"
                         mutation: Mutation = Mutation(
                             self.transcript,
                             self.exon2chain[init_mut.exon],
@@ -1326,9 +1705,9 @@ class ProcessedSegment:
                             init_mut.stop,
                             COMPENSATION,
                             description,
-                            False, ## compensated mutation entries are not masked
-                            '-', ## since they are not masked, the reason slot is kept empty
-                            mut_id
+                            False,  ## compensated mutation entries are not masked
+                            "-",  ## since they are not masked, the reason slot is kept empty
+                            mut_id,
                         )
                         self.mutation_list.append(mutation)
                         self.compensation_counter += 1
@@ -1340,14 +1719,16 @@ class ProcessedSegment:
                         for compensated in fs_group:
                             orig_number: int = frameshifts[compensated][0]
                             self.mutation_list[orig_number].is_masked = True
-                            self.mutation_list[orig_number].masking_reason = COMPENSATION_REASON
+                            self.mutation_list[
+                                orig_number
+                            ].masking_reason = COMPENSATION_REASON
                             self.frameshift2compensation[orig_number] = mut_num
                         muts_to_mask: List[int] = []
                         for k, mut in enumerate(self.mutation_list):
                             if mut.mutation_class != STOP:
                                 continue
                             if isinstance(mut.codon, str):
-                                first_codon, last_codon = map(int, mut.codon.split('_'))
+                                first_codon, last_codon = map(int, mut.codon.split("_"))
                                 if alt_start < first_codon < alt_stop:
                                     continue
                                 if alt_start < last_codon < alt_stop:
@@ -1363,14 +1744,20 @@ class ProcessedSegment:
                             alt_frame_start = first_affected
                         comp_start_codon: int = frameshifts[fs_group[0]][1].ref_codon
                         comp_end_codon: int = frameshifts[fs_group[-1]][1].ref_codon
-                        if spliceai_mitigated or same_correction_event or spliceai_corr_migrated:
+                        if (
+                            spliceai_mitigated
+                            or same_correction_event
+                            or spliceai_corr_migrated
+                        ):
                             self.spliceai_compensations.append(mut_num)
                         self.alternative_frames[mut_num] = (
-                            comp_start_codon, comp_end_codon, spliceai_mitigated or same_correction_event
+                            comp_start_codon,
+                            comp_end_codon,
+                            spliceai_mitigated or same_correction_event,
                         )
                     else:
                         alt_frame_start = None
-                    ## once compensating mutation is found, 
+                    ## once compensating mutation is found,
                     ## break the inner loop
                     break
 
@@ -1383,7 +1770,7 @@ class ProcessedSegment:
         3) deletions affect short terminal exons
         TODO: Where was the FIRST_LAST_DEL_SIZE length threshold inferred from and should it be adjusted?
         """
-        if self.exon_num == 1: 
+        if self.exon_num == 1:
             ## obviously makes no sense for single-exon transcripts
             return
         ## get series of consecutive exon deletions
@@ -1392,7 +1779,7 @@ class ProcessedSegment:
             return
         already_compensated: List[int] = []
         for deletion_run in deletion_runs:
-            if len(deletion_run) == 1: 
+            if len(deletion_run) == 1:
                 ## lone deletion can be self-compensated
                 lone_del: int = deletion_run[0]
                 del_run: int = self.ref_exon_lengths[lone_del]
@@ -1400,12 +1787,12 @@ class ProcessedSegment:
                     already_compensated.append(lone_del)
                 continue
             for inum, init_del in enumerate(deletion_run):
-                if init_del in already_compensated: 
+                if init_del in already_compensated:
                     ## ignore deletion if it has already been compensated
                     continue
                 group: List[int] = [init_del]
                 group_len: int = self.ref_exon_lengths[init_del]
-                for other_del in deletion_run[inum+1:]:
+                for other_del in deletion_run[inum + 1 :]:
                     group.append(other_del)
                     other_len: int = self.ref_exon_lengths[other_del]
                     group_len += other_len
@@ -1418,19 +1805,23 @@ class ProcessedSegment:
             first: bool = del_num == 1
             last: bool = del_num == self.exon_num
             short_enough: bool = self.ref_exon_lengths[del_num] < TERMINAL_EXON_DEL_SIZE
-            if (first or last) and short_enough: 
+            if (first or last) and short_enough:
                 ## short terminal deleted exons are qualified as missing
                 for mut in self.exon2mutations[del_num]:
                     if self.mutation_list[mut].mutation_class == DEL_EXON:
                         self.mutation_list[mut].mutation_class = MISS_EXON
-                        self.mutation_list[mut].mutation_id = f'MDEL_{self.mdel_counter}' ## TODO: this disrupt the deletion numeration!!!
+                        self.mutation_list[
+                            mut
+                        ].mutation_id = f"MDEL_{self.mdel_counter}"  ## TODO: this disrupt the deletion numeration!!!
                         self.mdel_counter += 1
                         # del deletion2mask[del_num]
-                self.exon_presence[del_num] = 'M'
-            else: 
+                self.exon_presence[del_num] = "M"
+            else:
                 ## simply mask the deletion entry
                 for mut in self.exon2mutations[del_num]:
-                    if self.mutation_list[mut].mutation_class == DEL_EXON: ## TODO: Swap description and mutation class for deleted exons thorughout the text
+                    if (
+                        self.mutation_list[mut].mutation_class == DEL_EXON
+                    ):  ## TODO: Swap description and mutation class for deleted exons thorughout the text
                         self.mutation_list[mut].is_masked = True
                         self.deletion2mask[del_num] = True
         self._check_updated_split_codons()
@@ -1443,14 +1834,18 @@ class ProcessedSegment:
         muts_to_unmask: List[Tuple[int, str]] = []
         for i, mut in enumerate(self.mutation_list):
             codon: int = mut.codon
-            if isinstance(codon, str) and '_' in codon:
-                codons: Tuple[int] = tuple(int(x) for x in codon.split('_'))
+            if isinstance(codon, str) and "_" in codon:
+                codons: Tuple[int] = tuple(int(x) for x in codon.split("_"))
             else:
                 codons: Tuple[int] = (int(codon),)
-            codon: int = mut.codon if isinstance(mut.codon, int) else int(mut.codon.split('_')[0])
+            codon: int = (
+                mut.codon
+                if isinstance(mut.codon, int)
+                else int(mut.codon.split("_")[0])
+            )
             exon: Union[int, str] = mut.exon
-            if isinstance(exon, str) and '_' in exon:
-                first_exon, last_exon = map(int, exon.split('_'))
+            if isinstance(exon, str) and "_" in exon:
+                first_exon, last_exon = map(int, exon.split("_"))
                 exons: List[int] = list(range(first_exon, last_exon + 1))
             else:
                 exons: List[int] = [exon]
@@ -1459,19 +1854,21 @@ class ProcessedSegment:
             mut_class: str = mut.mutation_class
             if mut_class == DEL_EXON and self.exon_num == 1:
                 continue
-            if is_masked or reason != '-' or mut_class in ('COMPENSATION', MISS_EXON):
+            if is_masked or reason != "-" or mut_class in ("COMPENSATION", MISS_EXON):
                 continue
             masked_by_deletion: bool = False
             for exon in exons:
                 ex_status: str = self.exon_presence[exon]
-                if ex_status != 'I' and mut_class not in DEL_MISS:
+                if ex_status != "I" and mut_class not in DEL_MISS:
                     self.mutation_list[i].is_masked = True
-                    self.mutation_list[i].masking_reason = (EX_DEL_REASON if ex_status == 'D' else EX_MISS_REASON) #f'Exon is {"deleted" if ex_status == "D" else "missing"}'
+                    self.mutation_list[i].masking_reason = (
+                        EX_DEL_REASON if ex_status == "D" else EX_MISS_REASON
+                    )  # f'Exon is {"deleted" if ex_status == "D" else "missing"}'
                     masked_by_deletion = True
                     continue
             if masked_by_deletion:
                 continue
-            ## check if mutation lies it C-terminal 10% 
+            ## check if mutation lies it C-terminal 10%
             ## or is masked by alternative start in the N-terminal 10%
             max_codon: int = max(self.all_ref_codons)
             for codon in codons:
@@ -1482,7 +1879,10 @@ class ProcessedSegment:
                 if not is_masked:
                     break
             ## mask this mutation for now; positional masking will be revised later
-            self.mutation_list[i].is_masked, self.mutation_list[i].masking_reason = is_masked, reason
+            self.mutation_list[i].is_masked, self.mutation_list[i].masking_reason = (
+                is_masked,
+                reason,
+            )
             muts_to_unmask.append(i)
             for exon in exons:
                 if self.mutation_list[i].is_masked and mut_class in DEL_MISS:
@@ -1490,22 +1890,24 @@ class ProcessedSegment:
         ## if there are non-masked or non-unmaskable critical mutations left,
         ## unmask compensated frameshifts and positionally masked mutations
         affecting_muts: List[Mutation] = [
-            x for x in self.mutation_list if
-            x.mutation_class not in SAFE_UNMASKABLE_TYPES and 
-            x.masking_reason not in SAFE_UNMASKABLE_REASONS and
-            not (x.mutation_class == DEL_EXON and self.deletion2mask.get(x.exon, False))
+            x
+            for x in self.mutation_list
+            if x.mutation_class not in SAFE_UNMASKABLE_TYPES
+            and x.masking_reason not in SAFE_UNMASKABLE_REASONS
+            and not (
+                x.mutation_class == DEL_EXON and self.deletion2mask.get(x.exon, False)
+            )
         ]
         if not affecting_muts:
             return
         unsafe_found: bool = any(
             x.masking_reason != COMPENSATION_REASON for x in affecting_muts
         )
-        inactivating_found: bool = any(
-            not x.is_masked for x in affecting_muts
-        )
+        inactivating_found: bool = any(not x.is_masked for x in affecting_muts)
         comp_num: int = len(
             [
-                x for x in list(set(self.frameshift2compensation.values()))
+                x
+                for x in list(set(self.frameshift2compensation.values()))
                 if x not in self.spliceai_compensations
             ]
         )
@@ -1513,20 +1915,20 @@ class ProcessedSegment:
         ## 1) there are two or more alternative frames - DEPRECATED
         ## 2) there is alternative frame and at least one mutation outside of it - POTENTIALLY DEPRECATED
         ## 3) there is at least one unmasked inactivating mutation
-        if inactivating_found:# or (unsafe_found and comp_num > 0):# or comp_num > 1:
+        if inactivating_found:  # or (unsafe_found and comp_num > 0):# or comp_num > 1:
             for i in muts_to_unmask:
                 self.mutation_list[i].is_masked = False
-                self.mutation_list[i].masking_reason = '-'
+                self.mutation_list[i].masking_reason = "-"
             for fs, comp in self.frameshift2compensation.items():
                 if comp in self.spliceai_compensations:
                     continue
                 self.mutation_list[fs].is_masked = False
-                self.mutation_list[fs].masking_reason = '-'
+                self.mutation_list[fs].masking_reason = "-"
                 if comp not in self.comps_to_delete:
                     self.comps_to_delete.append(comp)
                     for k in self.alt_frame_masked[comp]:
                         self.mutation_list[k].is_masked = False
-                        self.mutation_list[k].masking_reason = '-'
+                        self.mutation_list[k].masking_reason = "-"
             for comp in self.comps_to_delete:
                 del self.alternative_frames[comp]
 
@@ -1541,29 +1943,36 @@ class ProcessedSegment:
         * Deleted (D): respective exon is deleted without affecting the reading frame
         * Lost (L): codon either belongs to deleted exon or is affected by
           detrimental mutation(s)
-        If ignore_alternative_frame is set to True, codons confined between 
+        If ignore_alternative_frame is set to True, codons confined between
         compensated frameshifts are ignored for the purpose of these features' computation
         """
-        all_codon_status: str = '' ## stores codon presence statuses
+        all_codon_status: str = ""  ## stores codon presence statuses
         for exon, state in self.exon_presence.items():
             first_codon, last_codon = self.exon2ref_codons[exon]
             # first_codon, last_codon = self.exon2codons[exon]
             for codon_num in range(first_codon, last_codon):
-                codon_seq: str = ''.join(
-                    self.all_query_codons[x] for x in sorted(self.ref_codon2triplets[codon_num])
+                codon_seq: str = "".join(
+                    self.all_query_codons[x]
+                    for x in sorted(self.ref_codon2triplets[codon_num])
                 )
-                if state == 'D': ## add 'D' to all_codon_status unless deletion is masked or something like that
-                    status: str = 'D' if self.deletion2mask[exon] else 'L'
+                if (
+                    state == "D"
+                ):  ## add 'D' to all_codon_status unless deletion is masked or something like that
+                    status: str = "D" if self.deletion2mask[exon] else "L"
                     all_codon_status += status
                     continue
-                if state == 'M': ## codon is missing, simple as
-                    all_codon_status += 'M'
+                if state == "M":  ## codon is missing, simple as
+                    all_codon_status += "M"
                     continue
-                ## if alternative frame is not considered for conservation assessment, 
+                ## if alternative frame is not considered for conservation assessment,
                 ## ignore the codons confined between compensared frameshifts
                 if self.ignore_alternative_frame:
                     is_in_alt_frame: bool = False
-                    for i, (alt_frame_start, alt_frame_end, spliceai) in self.alternative_frames.items():
+                    for i, (
+                        alt_frame_start,
+                        alt_frame_end,
+                        spliceai,
+                    ) in self.alternative_frames.items():
                         if spliceai:
                             continue
                         if alt_frame_start <= codon_num < alt_frame_end:
@@ -1571,70 +1980,90 @@ class ProcessedSegment:
                             break
                     ## commented is the original intent
                     if is_in_alt_frame:
-                        all_codon_status += 'A'
+                        all_codon_status += "A"
                         continue
-                status: str = 'I' ## assign Intact status by default
+                status: str = "I"  ## assign Intact status by default
                 ## resulting status depends on the mutation type
-                if codon_num in self.ref_codon2mutations: ## resulting status depends on the mutation type
+                if (
+                    codon_num in self.ref_codon2mutations
+                ):  ## resulting status depends on the mutation type
                     for mut_num in self.ref_codon2mutations[codon_num]:
                         mutation: Mutation = self.mutation_list[mut_num]
                         mut_class: str = mutation.mutation_class
-                        if mut_class in DEL_MISS: ## already handled above, proceed further
-                            continue
-                        if mut_class == START_MISSING: ## not considered as inactivating mutation, proceed
-                            continue
-                        if mut_class == COMPENSATION and mut_num not in self.comps_to_delete: ## compensation events do not count
+                        if (
+                            mut_class in DEL_MISS
+                        ):  ## already handled above, proceed further
                             continue
                         if (
-                            mut_class in (FS_DEL, FS_INS) and
-                            mut_num in self.frameshift2compensation and
-                            not self.ignore_alternative_frame
-                        ): ## frameshift is compensated, proceed
+                            mut_class == START_MISSING
+                        ):  ## not considered as inactivating mutation, proceed
+                            continue
+                        if (
+                            mut_class == COMPENSATION
+                            and mut_num not in self.comps_to_delete
+                        ):  ## compensation events do not count
+                            continue
+                        if (
+                            mut_class in (FS_DEL, FS_INS)
+                            and mut_num in self.frameshift2compensation
+                            and not self.ignore_alternative_frame
+                        ):  ## frameshift is compensated, proceed
                             continue
                         if mut_class == BIG_DEL:
-                            status = 'D' if all(x == '-' for x in codon_seq) else 'I'
+                            status = "D" if all(x == "-" for x in codon_seq) else "I"
                             continue
-                        if mutation.is_masked: ## whatever the reason is, the mutation is masked; proceed
+                        if (
+                            mutation.is_masked
+                        ):  ## whatever the reason is, the mutation is masked; proceed
                             continue
                         ## if the algorithm made it to this point, the mutation
                         ## is deleterious and unmasked; this involves nonsenses,
                         ## uncompensated frameshifts, BIG insertions/deletions,
                         ## and splice site mutations
-                        status = 'L'
+                        status = "L"
                 else:
-                    status: str = 'D' if all(x == '-' for x in codon_seq) else 'I'
+                    status: str = "D" if all(x == "-" for x in codon_seq) else "I"
                 all_codon_status += status
         ## for now, sequence properties are calculated as implemented in old CESAR_wrapper.py
-        first10: int = len(all_codon_status) // 10 ## TODO: should codon_deletions_omitted used instead of all_codon_status ????
+        first10: int = (
+            len(all_codon_status) // 10
+        )  ## TODO: should codon_deletions_omitted used instead of all_codon_status ????
         last10: int = len(all_codon_status) - first10
         ## remove deletions
-        codon_deletions_omitted: str = all_codon_status.replace('D', '')
+        codon_deletions_omitted: str = all_codon_status.replace("D", "")
         gene_len: int = len(all_codon_status)
         ## create two copies of status profile: with missing codons removed and
         ## with missing codons regarded as intact
         ## commented is the original intent
-        missing_ignored: str = codon_deletions_omitted.replace('A','L').replace('M', '')
-        missing_as_intact: str = codon_deletions_omitted.replace('A', 'L').replace('M', 'I')
+        missing_ignored: str = codon_deletions_omitted.replace("A", "L").replace(
+            "M", ""
+        )
+        missing_as_intact: str = codon_deletions_omitted.replace("A", "L").replace(
+            "M", "I"
+        )
         ## get the spans of non-lost codons for both profiles
-        missing_ignored_spans: List[List[str]] = missing_ignored.split('L')
-        missing_as_intact_spans: List[List[str]] = missing_as_intact.split('L')
+        missing_ignored_spans: List[List[str]] = missing_ignored.split("L")
+        missing_as_intact_spans: List[List[str]] = missing_as_intact.split("L")
         ## find the longest span for both profiles
         longest_span_omitted: int = max(len(x) for x in missing_ignored_spans)
-        longest_span_as_intact: int = max(
-            len(x) for x in missing_as_intact_spans
-        )
+        longest_span_as_intact: int = max(len(x) for x in missing_as_intact_spans)
         ## compute the longest span fraction in both cases
         self.longest_fraction_strict: float = longest_span_omitted / gene_len
         self.longest_fraction_relaxed: float = longest_span_as_intact / gene_len
-        self.middle_is_intact: bool = 'L' not in all_codon_status[
-            (first10 if self.mask_terminal_mutations else 0):last10
-        ]
-        self.middle_is_present: bool = 'M' not in all_codon_status[first10:last10]
+        self.middle_is_intact: bool = (
+            "L"
+            not in all_codon_status[
+                (first10 if self.mask_terminal_mutations else 0) : last10
+            ]
+        )
+        self.middle_is_present: bool = "M" not in all_codon_status[first10:last10]
         ## compute the non-missing fraction of the segment
-        non_missing: int = len(all_codon_status) - all_codon_status.count('M')
+        non_missing: int = len(all_codon_status) - all_codon_status.count("M")
         self.total_intact_fraction: float = (
-            1.0 if not non_missing else 
-            (all_codon_status.count('I') + all_codon_status.count('A')) / non_missing
+            1.0
+            if not non_missing
+            else (all_codon_status.count("I") + all_codon_status.count("A"))
+            / non_missing
         )
 
     def classify_projection(self) -> None:
@@ -1644,20 +2073,21 @@ class ProcessedSegment:
         """
         self._calc_id_values()
         critical_mutations: List[Mutation] = [
-            x for i, x in enumerate(self.mutation_list) if
-            not x.is_masked and (
-                x.mutation_class != COMPENSATION or i in self.comps_to_delete
-            ) or
-            x.mutation_class == MISS_EXON
+            x
+            for i, x in enumerate(self.mutation_list)
+            if not x.is_masked
+            and (x.mutation_class != COMPENSATION or i in self.comps_to_delete)
+            or x.mutation_class == MISS_EXON
         ]
         ## mutation-less projections with high identity values
         ## are automatically classified as intact
         if (
-            not critical_mutations and
-            self.longest_fraction_strict > STRICT_FACTION_INTACT_THRESHOLD
+            not critical_mutations
+            and self.longest_fraction_strict > STRICT_FACTION_INTACT_THRESHOLD
         ):
             architecture_non_affecting: List[Mutation] = [
-                x for i, x in enumerate(self.mutation_list)
+                x
+                for i, x in enumerate(self.mutation_list)
                 if not self._architecture_preserving_mutation(x, i)
             ]
             if not architecture_non_affecting:
@@ -1667,7 +2097,7 @@ class ProcessedSegment:
             return
 
         ## projections with all exons marked as deleted are deleted themselves
-        if all(x == 'D' for x in self.exon_presence.values()):
+        if all(x == "D" for x in self.exon_presence.values()):
             self.loss_status = self._alt_loss_status(L)
             return
 
@@ -1688,7 +2118,7 @@ class ProcessedSegment:
             return
         ## alignment gap sequence clipping sometimes yields highly ambiguous sequences
         ## otherwise classified as (F/P)I; explicitly classify those as missing
-        if all(x in ('X', 'x', '*') for x in self.query_aa_seq.values()):
+        if all(x in ("X", "x", "*") for x in self.query_aa_seq.values()):
             self.loss_status = self._alt_loss_status(M)
             return
 
@@ -1696,22 +2126,24 @@ class ProcessedSegment:
         ## first, get the mutations that affect the following part of classification
         affecting_mutations: List[Mutation] = []
         for mut in critical_mutations:
-            if isinstance(mut.exon, str) and '_' in mut.exon:
-                first_exon, last_exon = map(int, mut.exon.split('_'))
+            if isinstance(mut.exon, str) and "_" in mut.exon:
+                first_exon, last_exon = map(int, mut.exon.split("_"))
                 exons: List[int] = list(range(first_exon, last_exon + 1))
             else:
                 exons: List[int] = [mut.exon]
-            if any(self.exon_presence[x] == 'I' for x in exons):
+            if any(self.exon_presence[x] == "I" for x in exons):
                 affecting_mutations.append(mut)
-        ## second, get the portion of the reference sequence 
+        ## second, get the portion of the reference sequence
         ## comprised by missing exons
         missing_seq_len: int = sum(
-            v for k,v in self.ref_exon_lengths.items() if self.exon_presence[k] == 'M'
+            v for k, v in self.ref_exon_lengths.items() if self.exon_presence[k] == "M"
         )
         missing_seq_perc: float = missing_seq_len / self.reference_length
         ## third, get the exons which comprise more than 40% of the ref sequence each
         bigger_exons: Set[int] = {
-            k for k,v in self.ref_exon_lengths.items() if v / self.reference_length > 0.4
+            k
+            for k, v in self.ref_exon_lengths.items()
+            if v / self.reference_length > 0.4
         }
 
         ## and now, classify the remaining cases
@@ -1749,7 +2181,10 @@ class ProcessedSegment:
                 ## single exon projections require at least two mutations and
                 ## longest non-missing intact fraction of less than 60%
                 ## to be a confirmed loss
-                if len(affecting_mutations) > 1 and self.longest_fraction_strict < STRICT_FACTION_INTACT_THRESHOLD:
+                if (
+                    len(affecting_mutations) > 1
+                    and self.longest_fraction_strict < STRICT_FACTION_INTACT_THRESHOLD
+                ):
                     self.loss_status = self._alt_loss_status(L)
                 else:
                     self.loss_status = UL
@@ -1764,17 +2199,18 @@ class ProcessedSegment:
                         if isinstance(aff_mut.exon, int):
                             mut_affected_exons.add(aff_mut.exon)
                         else:
-                            for aff_ex in aff_mut.exon.split('_'):
+                            for aff_ex in aff_mut.exon.split("_"):
                                 mut_affected_exons.add(int(aff_ex))
                     del_affected_exons: Set[int] = {
-                        k for k, v in self.exon_presence.items() if v == 'D'
-                        and not self.deletion2mask[k]
+                        k
+                        for k, v in self.exon_presence.items()
+                        if v == "D" and not self.deletion2mask[k]
                     }
                     num_affected_exons: int = len(
                         mut_affected_exons.union(del_affected_exons)
                     )
                     max_affected_exon_num: int = get_affected_exon_threshold(
-                        sum(x != 'M' for x in self.exon_presence.values())
+                        sum(x != "M" for x in self.exon_presence.values())
                     )
                     ## if affected exon number threshold is exceeded,
                     ## report the projection as missing
@@ -1785,7 +2221,7 @@ class ProcessedSegment:
                     ## deleted or affected by 2+ mutations; this would mark the projection
                     ## as lost
                     for be in bigger_exons:
-                        if self.exon_presence[be] == 'D' and not self.deletion2mask[be]:
+                        if self.exon_presence[be] == "D" and not self.deletion2mask[be]:
                             self.loss_status = self._alt_loss_status(L)
                             return
                         if sum(x.exon == be for x in affecting_mutations) > 1:
@@ -1807,7 +2243,10 @@ class ProcessedSegment:
         new_mut_list: List[int] = []
         for i, mut in enumerate(self.mutation_list):
             ## remove frameshifts participating in certain compensations
-            if mut.mutation_class in (FS_INS, FS_DEL) and i in self.frameshift2compensation:
+            if (
+                mut.mutation_class in (FS_INS, FS_DEL)
+                and i in self.frameshift2compensation
+            ):
                 comp: int = self.frameshift2compensation[i]
                 ## do not add deprecated compensations
                 if comp in self.spliceai_compensations:
@@ -1833,9 +2272,13 @@ class ProcessedSegment:
 
     def plot_svg(self) -> None:
         """Creates an SVG plot for the projection"""
-        self.svg = ProjectionPlotter(
-            self.name, self.ref_exon_lengths, self.mutation_list, self.exon2chain
-        ).plot_svg().replace('\n', '')
+        self.svg = (
+            ProjectionPlotter(
+                self.name, self.ref_exon_lengths, self.mutation_list, self.exon2chain
+            )
+            .plot_svg()
+            .replace("\n", "")
+        )
 
     def _abs_coord(self, base: int, exon: int = None, portion: int = None) -> int:
         """
@@ -1853,14 +2296,18 @@ class ProcessedSegment:
             p: int = portion
         strand: bool = self.portion2strand[p]
         rel_start, rel_stop = self.portion2coords[p]
-        gap_num: int = self.query[rel_start:base].count('-')
+        gap_num: int = self.query[rel_start:base].count("-")
         abs_start, abs_stop = self.portion2abs_coords[p][1:]
         adj_base: int = base - rel_start
-        return (abs_start + adj_base - gap_num) if strand else (abs_stop - adj_base + gap_num)
+        return (
+            (abs_start + adj_base - gap_num)
+            if strand
+            else (abs_stop - adj_base + gap_num)
+        )
 
     def _rel_coord(
         self, base: int, counter: int = 0, exon: int = None, portion: int = None
-    ) -> int: ## TODO: Needs testing
+    ) -> int:  ## TODO: Needs testing
         """
         Given the absolute coordinate, reduce it to the relative coordinate
         in the alignment
@@ -1887,7 +2334,7 @@ class ProcessedSegment:
                 break
             if n.isalpha():
                 adj_coord += 1
-        gap_num: int = self.query[rel_start:i].count('-')
+        gap_num: int = self.query[rel_start:i].count("-")
         return i
 
     def _closest_non_gap(self, base: int, exon: int) -> int:
@@ -1899,17 +2346,16 @@ class ProcessedSegment:
         p_start, _ = self.portion2coords[portion]
         for i in range(base, p_start - 1, -1):
             n: str = self.query[i]
-            if n != '-':
+            if n != "-":
                 return i
         return base
-
 
     def _base2portion(self, base: int) -> int:
         """
         Given the relative base coordinate in the concatenated alignment,
         return the CESAR output piece it referes to
         """
-        is_gap: str = self.query[base] == '-'
+        is_gap: str = self.query[base] == "-"
         for portion, coords in self.portion2coords.items():
             if (base < coords[0] or base >= coords[1]) and is_gap:
                 continue
@@ -1917,7 +2363,7 @@ class ProcessedSegment:
                 continue
             return portion
         raise Exception(
-            f'Alignment position {base} does not refere to any CESAR alignment portion'
+            f"Alignment position {base} does not refere to any CESAR alignment portion"
         )
 
     def _absbase2portion(self, base: int) -> int:
@@ -1930,7 +2376,7 @@ class ProcessedSegment:
                 continue
             return portion
         raise Exception(
-            f'Alignment position {base} does not refere to any CESAR alignment portion'
+            f"Alignment position {base} does not refere to any CESAR alignment portion"
         )
 
     def _base2codon(self, i: int, exon: int, ref_codon: bool = False) -> int:
@@ -1940,11 +2386,10 @@ class ProcessedSegment:
             coords: List[int] = self.triplet_coordinates[c]
             start: int = min(coords)
             end: int = max(coords)
-            if start - 1     <= i <= end + 1:
+            if start - 1 <= i <= end + 1:
                 if ref_codon:
                     return self.triplet2ref_codon[c]
                 return c
-
 
     def _exon2strand(self, exon: int) -> bool:
         """For a given exon number, returns the strand it was aligned to"""
@@ -1960,7 +2405,7 @@ class ProcessedSegment:
         _start, _stop = self.portion2coords[p]
         return max(min(base + step, _stop), _start)
 
-    def _codon2exon(self, codon: int) -> int: ## NEEDS UPDATE
+    def _codon2exon(self, codon: int) -> int:  ## NEEDS UPDATE
         """For a given codon number, return the (reference) exon it belongs to"""
         if not self.exon2codons:
             ## special condition when procedure is run for a yet unterminated first exon
@@ -1973,7 +2418,7 @@ class ProcessedSegment:
             elif exon == max(self.exon2codons) and codon >= first:
                 yield exon
 
-    def _codon2chrom(self, codon: int) -> str: ## NEEDS UPDATE
+    def _codon2chrom(self, codon: int) -> str:  ## NEEDS UPDATE
         """
         For a given codon number, returns the chromosome
         it is located on in the query
@@ -1994,7 +2439,7 @@ class ProcessedSegment:
         coords: List[int] = self.triplet_coordinates.get(codon, [])
         if len(coords) > 1:
             return (chrom, min(coords), max(coords))
-        else: 
+        else:
             ## a workaround for exon shorter than one full codon
             ## _codon2exon returns all the exons the codon corresponds to
             exons: List[int] = list(self._codon2exon(codon))
@@ -2007,7 +2452,7 @@ class ProcessedSegment:
                 exon: int = exons.pop()
             coords = self.abs_exon_coords[exon].tuple()
             return (chrom, min(coords), max(coords))
-    
+
     def _exon_was_corrected(self, exon: int) -> bool:
         """Returns whether the exon was SpliceAI-corrected"""
         if self.correction_mode <= 1:
@@ -2023,11 +2468,15 @@ class ProcessedSegment:
         first_codon, last_codon = self.exon2codons[exon]
         is_first_codon: bool = triplet == first_codon
         is_last_codon: bool = triplet == last_codon - 1 or (
-            triplet in self.split_codon_struct.keys() and exon in self.split_codon_struct[triplet]
+            triplet in self.split_codon_struct.keys()
+            and exon in self.split_codon_struct[triplet]
         )
-        orig_start, orig_end = sorted(map(
-            lambda x: self._abs_coord(x, exon=exon), self.cesar_rel_coords[exon].tuple()
-        ))
+        orig_start, orig_end = sorted(
+            map(
+                lambda x: self._abs_coord(x, exon=exon),
+                self.cesar_rel_coords[exon].tuple(),
+            )
+        )
         upd_start, upd_end = self.abs_exon_coords[exon].tuple()
         triplet_bases: List[int] = self.triplet_coordinates[triplet]
         strand: bool = self._exon2strand(exon)
@@ -2055,20 +2504,20 @@ class ProcessedSegment:
 
     def _mutations_in_same_query_codon(self, mut1: Mutation, mut2: Mutation) -> bool:
         """
-        For rare cases of convoluted SpliceAI-induced pseudoframeshifts, 
+        For rare cases of convoluted SpliceAI-induced pseudoframeshifts,
         checks whether the two triplets are in fact part of one codon
         """
         if isinstance(mut1.exon, str):
-            first_exon: int = max(map(int, mut1.exon.split('_')))
+            first_exon: int = max(map(int, mut1.exon.split("_")))
         else:
             first_exon: int = mut1.exon
         if isinstance(mut2.exon, str):
-            last_exon: int = min(map(int, mut2.exon.split('_')))
+            last_exon: int = min(map(int, mut2.exon.split("_")))
         else:
             last_exon: int = mut2.exon
         if last_exon != first_exon + 1:
             return False
-        full_query_seq: str = ''
+        full_query_seq: str = ""
         first_codon: int = mut1.codon
         last_codon: int = mut2.codon
         for codon in range(first_codon, last_codon + 1):
@@ -2076,7 +2525,7 @@ class ProcessedSegment:
                 query_codon_seq: str = self.query_codons_to_mask[codon]
             else:
                 query_codon_seq: str = self.all_query_codons[codon]
-            full_query_seq += query_codon_seq.replace('-', '')
+            full_query_seq += query_codon_seq.replace("-", "")
         return len(full_query_seq) == 3
 
     def _comp_moved_to_split_codon(self, mut1: Mutation, mut2: Mutation) -> bool:
@@ -2085,11 +2534,11 @@ class ProcessedSegment:
         migrating to the next exon
         """
         if isinstance(mut1.exon, str):
-            first_exon: int = max(map(int, mut1.exon.split('_')))
+            first_exon: int = max(map(int, mut1.exon.split("_")))
         else:
             first_exon: int = mut1.exon
         if isinstance(mut2.exon, str):
-            last_exon: int = min(map(int, mut2.exon.split('_')))
+            last_exon: int = min(map(int, mut2.exon.split("_")))
         else:
             last_exon: int = mut2.exon
         if last_exon != first_exon + 1:
@@ -2100,7 +2549,10 @@ class ProcessedSegment:
         for triplet in self.ref_codon2triplets[last_codon]:
             if triplet in self.split_codon_struct:
                 triplet_split_struct: Dict[int, int] = self.split_codon_struct[triplet]
-                if first_exon in triplet_split_struct and last_exon in triplet_split_struct:
+                if (
+                    first_exon in triplet_split_struct
+                    and last_exon in triplet_split_struct
+                ):
                     return True
         return False
 
@@ -2110,11 +2562,11 @@ class ProcessedSegment:
         FS mutation 'leaked' further into the next exon
         """
         if isinstance(mut1.exon, str):
-            first_exon: int = max(map(int, mut1.exon.split('_')))
+            first_exon: int = max(map(int, mut1.exon.split("_")))
         else:
             first_exon: int = mut1.exon
         if isinstance(mut2.exon, str):
-            last_exon: int = min(map(int, mut2.exon.split('_')))
+            last_exon: int = min(map(int, mut2.exon.split("_")))
         else:
             last_exon: int = mut2.exon
         if last_exon != first_exon + 1:
@@ -2124,7 +2576,9 @@ class ProcessedSegment:
         prev_was_corrected: bool = self._exon_was_corrected(mut1.exon)
         if not prev_was_corrected:
             return False
-        return (mut2_start <= exon_start <= mut2_end) or (mut2_start <= exon_start <= mut2_end)
+        return (mut2_start <= exon_start <= mut2_end) or (
+            mut2_start <= exon_start <= mut2_end
+        )
 
     def _min_annot_codon(self) -> int:
         """Returns the first non-gap codon in the query"""
@@ -2134,7 +2588,7 @@ class ProcessedSegment:
 
     def _next_complete_codon(self, num: int, prev: bool = False) -> int:
         """
-        Returns the number of the first frame-preserving codon 
+        Returns the number of the first frame-preserving codon
         previous/following to a given one
         """
         if num == 1 and prev:
@@ -2142,8 +2596,9 @@ class ProcessedSegment:
         if num == max(self.triplet2ref_codon) and not prev:
             return num
         search_range: Iterable[int] = (
-            range(num - 1, 0, -1) if prev else
-            range(num + 1, max(self.triplet2ref_codon) + 1)
+            range(num - 1, 0, -1)
+            if prev
+            else range(num + 1, max(self.triplet2ref_codon) + 1)
         )
         max_triplet: int = max(self.triplet2ref_codon)
         for i in search_range:
@@ -2151,7 +2606,9 @@ class ProcessedSegment:
                 return max(i, 1) if prev else min(i, max_triplet)
         return 1 if prev else max_triplet
 
-    def _merged_exon_streak(self, exon: int) -> Tuple[int]: ## TODO: Tested only on minimal examples; test further
+    def _merged_exon_streak(
+        self, exon: int
+    ) -> Tuple[int]:  ## TODO: Tested only on minimal examples; test further
         """Returns the iterable of exons merged in query for the given exons"""
         streak: List[int] = [1]
         for i, is_lost in self.intron_deleted.items():
@@ -2162,16 +2619,14 @@ class ProcessedSegment:
                     return (i,)
                 streak = []
             # streak.append(i)
-            streak.append(i+1)
+            streak.append(i + 1)
         if exon in streak:
             return tuple(streak)
 
-    def _get_intron_phase(
-        self, intron: int, ref: bool = True
-    ) -> int:
+    def _get_intron_phase(self, intron: int, ref: bool = True) -> int:
         """Returns intron phase for the given intron number in the query"""
         prev_intron_phase: int = 0
-        total_seq: str = ''
+        total_seq: str = ""
         merged_exons: List[int] = [intron]
         for x in range(intron - 1, 0, -1):
             _prev_phase: int = self.intron2phase.get(x, 0)
@@ -2183,8 +2638,10 @@ class ProcessedSegment:
         for ex in merged_exons[::-1]:
             prev_exon_start, prev_exon_end = self.rel_exon_coords[ex].tuple()
             total_seq += strip_noncoding(
-                getattr(self, 'reference' if ref else 'query')[prev_exon_start:prev_exon_end],
-                uppercase_only=not ref
+                getattr(self, "reference" if ref else "query")[
+                    prev_exon_start:prev_exon_end
+                ],
+                uppercase_only=not ref,
             )
         last_exon_length: int = len(total_seq)
         return (last_exon_length - 3 + prev_intron_phase) % 3
@@ -2197,7 +2654,7 @@ class ProcessedSegment:
         self, donor: int, acceptor: int, donor_exon: int, acc_exon: int
     ) -> Union[int, None]:
         """
-        Calculates the intron length; 
+        Calculates the intron length;
         returns None if donor and acceptor are located on different contigs
         """
         donor_chrom: str = self.portion2abs_coords[self.exon2portion[donor_exon]][0]
@@ -2206,34 +2663,43 @@ class ProcessedSegment:
             return None
         abs_donor: int = self._abs_coord(donor, exon=donor_exon)
         abs_acc: int = self._abs_coord(acceptor, exon=acc_exon)
-        start, end, = sorted((abs_donor, abs_acc))
+        (
+            start,
+            end,
+        ) = sorted((abs_donor, abs_acc))
         return end - start
 
     def _get_frameshift(self, start: int, end: int):
         """
-        Returns the difference in frame phase between reference and query sequences 
+        Returns the difference in frame phase between reference and query sequences
         confined within two coordinates
         """
         ## strip gained intron sequenes
-        ref_seq: str = ''.join(
+        ref_seq: str = "".join(
             [
-                self.reference[i] for i in range(start,end) if 
-                self.query[i].isupper() or self.query[i] == '-'
+                self.reference[i]
+                for i in range(start, end)
+                if self.query[i].isupper() or self.query[i] == "-"
             ]
         )
-        query_seq: str = ''.join(
+        query_seq: str = "".join(
             [
-                self.query[i] for i in range(start,end) if 
-                self.query[i].isupper() or self.query[i] == '-'
+                self.query[i]
+                for i in range(start, end)
+                if self.query[i].isupper() or self.query[i] == "-"
             ]
         )
         ## count overall deletion number in both sequences
-        ref_del: str = ref_seq.count('-') % 3
-        query_del: str = query_seq.count('-') % 3
+        ref_del: str = ref_seq.count("-") % 3
+        query_del: str = query_seq.count("-") % 3
         return ref_del - query_del
 
     def _site_is_inframe(
-        self, cesar: int, site: int, offset: Optional[int] = 0, donor: Optional[bool]=True
+        self,
+        cesar: int,
+        site: int,
+        offset: Optional[int] = 0,
+        donor: Optional[bool] = True,
     ) -> bool:
         """
         For a given CESAR-predicted exon start/stop and a SpliceAI-predicted
@@ -2246,7 +2712,9 @@ class ProcessedSegment:
         """
         ## get the distance between two coordinates in coding symbols
         distance: str = len(
-            strip_noncoding(self.query[slice(*sorted((cesar, site)))], uppercase_only=False)
+            strip_noncoding(
+                self.query[slice(*sorted((cesar, site)))], uppercase_only=False
+            )
         )
         ## define which side the frame is corrected from
         side_sign: int = 1 if donor else -1
@@ -2264,11 +2732,13 @@ class ProcessedSegment:
         for exon in p.exons:
             space_start, space_stop = p.exon_search_spaces[exon]
             if space_start is None:
-                self.spliceai_sites[exon]['donor'] = {
-                    self._rel_coord(x, portion=num):y for x, y in p.spliceai_sites['donor'].items()
+                self.spliceai_sites[exon]["donor"] = {
+                    self._rel_coord(x, portion=num): y
+                    for x, y in p.spliceai_sites["donor"].items()
                 }
-                self.spliceai_sites[exon]['acceptor'] = {
-                    self._rel_coord(x, portion=num):y for x, y in p.spliceai_sites['acceptor'].items()
+                self.spliceai_sites[exon]["acceptor"] = {
+                    self._rel_coord(x, portion=num): y
+                    for x, y in p.spliceai_sites["acceptor"].items()
                 }
                 continue
             aln_start, aln_stop = self.abs_exon_coords[exon].tuple()
@@ -2282,12 +2752,8 @@ class ProcessedSegment:
                     self.spliceai_sites[exon][key][rel_coord] = prob
 
     def _check_splice_site(
-        self,
-        exon: int,
-        base: int,
-        acc: bool = True,
-        check_only: bool = False
-    ) -> bool: ## TODO: Backtracking at erroneous introns results in overlaps -> fix it
+        self, exon: int, base: int, acc: bool = True, check_only: bool = False
+    ) -> bool:  ## TODO: Backtracking at erroneous introns results in overlaps -> fix it
         """
         For a given splice site at a given position, check if the site is intact;
         returns a boolean value indicating whether splice site is intact and does
@@ -2303,72 +2769,76 @@ class ProcessedSegment:
         ## return True for non-spliced sites
         if exon == 1 and acc:
             if not check_only:
-                self.splice_site_nucs[exon]['A'] = 'NA'
+                self.splice_site_nucs[exon]["A"] = "NA"
             return True
         if exon == self.exon_num and not acc:
             if not check_only:
-                self.splice_site_nucs[exon]['D'] = 'NA'
+                self.splice_site_nucs[exon]["D"] = "NA"
             return True
         if exon in self.unaligned_exons:
             if not check_only:
-                self.splice_site_nucs[exon]['A' if acc else 'D'] = '??'
+                self.splice_site_nucs[exon]["A" if acc else "D"] = "??"
             return True
         ## assess whether the dinucleotide at respective site is intact
         dinucleotide: str = (
-            self.query[self._safe_step(base, exon, -2):base] if acc else
-            self.query[base:self._safe_step(base, exon, 2)]
+            self.query[self._safe_step(base, exon, -2) : base]
+            if acc
+            else self.query[base : self._safe_step(base, exon, 2)]
         ).lower()
         is_intact: bool = dinucleotide in (
             LEFT_SPLICE_CORR if acc else RIGHT_SPLICE_CORR
         )
         if is_intact:
             if not check_only:
-                self.splice_site_nucs[exon][('A' if acc else 'D')] = dinucleotide
+                self.splice_site_nucs[exon][("A" if acc else "D")] = dinucleotide
             return True
         ## infer special conditions under which affected splice site is treated as valid
         is_intact = False
         to_mask: bool = False
-        reason: str = '-'
+        reason: str = "-"
         donor_exon: int = exon if not acc else exon - 1
         acc_exon: int = exon if acc else exon + 1
-        side: str = 'acceptor' if acc else 'donor'
-        site_is_u12: bool = self.u12[exon][side][0] == 'U12'
-        site_is_non_cano: bool = (
-            not site_is_u12 and self.u12[exon][side][1].lower() not in (
-                LEFT_SPLICE_CORR if acc else RIGHT_SPLICE_CORR
-            )
-        )
+        side: str = "acceptor" if acc else "donor"
+        site_is_u12: bool = self.u12[exon][side][0] == "U12"
+        site_is_non_cano: bool = not site_is_u12 and self.u12[exon][side][
+            1
+        ].lower() not in (LEFT_SPLICE_CORR if acc else RIGHT_SPLICE_CORR)
         ref_site: str = self.u12[exon][side][1]
-        donor_coord: int = self.rel_exon_coords[exon-1].stop if acc else base
-        acc_coord: int = base if acc else self.rel_exon_coords[exon+1].start
+        donor_coord: int = self.rel_exon_coords[exon - 1].stop if acc else base
+        acc_coord: int = base if acc else self.rel_exon_coords[exon + 1].start
         if acc:
             prev_site_mutated: Union[int, None] = next(
                 (
-                    x for x, mut in enumerate(self.mutation_list)if
-                    mut.mutation_class == SSM_D and mut.exon == exon - 1
-                ), None
+                    x
+                    for x, mut in enumerate(self.mutation_list)
+                    if mut.mutation_class == SSM_D and mut.exon == exon - 1
+                ),
+                None,
             )
         else:
             prev_site_mutated = None
-        if 'n' in dinucleotide:
-            to_mask, reason = True, 'Ambiguous symbol'
+        if "n" in dinucleotide:
+            to_mask, reason = True, "Ambiguous symbol"
         elif len(dinucleotide) < 2:
             is_intact = True
             dinucleotide = (
-                (dinucleotide + '?' * (2 - len(dinucleotide))) if not acc else
-                ('?' * (2 - len(dinucleotide)) + dinucleotide)
+                (dinucleotide + "?" * (2 - len(dinucleotide)))
+                if not acc
+                else ("?" * (2 - len(dinucleotide)) + dinucleotide)
             )
-            to_mask, reason = True, 'Insufficient data'
+            to_mask, reason = True, "Insufficient data"
         elif (
-            self._check_deleted_intron(donor_coord, acc_coord, donor_exon, acc_exon)[0] and 
-            prev_site_mutated is not None
+            self._check_deleted_intron(donor_coord, acc_coord, donor_exon, acc_exon)[0]
+            and prev_site_mutated is not None
         ):
-            to_mask, reason = True, 'Intron deletion'
+            to_mask, reason = True, "Intron deletion"
             self.mutation_list[prev_site_mutated].is_masked = to_mask
             self.mutation_list[prev_site_mutated].masking_reason = reason
-            dinucleotide: str = '--'
-            old_prev_name: str = self.mutation_list[prev_site_mutated].description.split('->')[0]
-            new_prev_name: str = f'{old_prev_name}->{dinucleotide}'
+            dinucleotide: str = "--"
+            old_prev_name: str = self.mutation_list[
+                prev_site_mutated
+            ].description.split("->")[0]
+            new_prev_name: str = f"{old_prev_name}->{dinucleotide}"
             self.mutation_list[prev_site_mutated].description = new_prev_name
         elif site_is_u12:
             to_mask, reason = True, U12_REASON
@@ -2377,14 +2847,16 @@ class ProcessedSegment:
         if check_only:
             return is_intact
         ## after this point, create a mutation instance
-        self.splice_site_nucs[exon][('A' if acc else 'D')] = dinucleotide
-        mut_name: str = f'{ref_site}->{dinucleotide}'
-        counter: int = self.donor_mutation_counter if not acc else self.acc_mutation_counter
-        mut_id: str = f'SSM{"A" if acc else "D"}_{counter}'
+        self.splice_site_nucs[exon][("A" if acc else "D")] = dinucleotide
+        mut_name: str = f"{ref_site}->{dinucleotide}"
+        counter: int = (
+            self.donor_mutation_counter if not acc else self.acc_mutation_counter
+        )
+        mut_id: str = f"SSM{'A' if acc else 'D'}_{counter}"
         chain: int = self.exon2chain[exon]
         codon: int = min(
-                max(self.exon2codons[exon][int(not acc)] - int(not acc), 1),
-                max(self.triplet2ref_codon)
+            max(self.exon2codons[exon][int(not acc)] - int(not acc), 1),
+            max(self.triplet2ref_codon),
         )
         ref_codon: int = self.triplet2ref_codon[codon]
         chrom: str = self.exon2chrom[exon]
@@ -2393,7 +2865,7 @@ class ProcessedSegment:
             if strand:
                 ## map to the last to nucleotides before the exon
                 end: int = self.abs_exon_coords[exon].tuple()[0]
-                start: int = max(end -2, 0)
+                start: int = max(end - 2, 0)
             else:
                 ## same, but strandwise it is now the first two nucleotides after the exon
                 start: int = self.abs_exon_coords[exon].tuple()[1]
@@ -2406,7 +2878,7 @@ class ProcessedSegment:
             else:
                 ## reverting the logic leads to the last two bases before the exon
                 end: int = self.abs_exon_coords[exon].tuple()[0]
-                start: int = max(end -2, 0)
+                start: int = max(end - 2, 0)
         splice_site_mut: Mutation = Mutation(
             self.transcript,
             chain,
@@ -2421,7 +2893,7 @@ class ProcessedSegment:
             mut_name,
             to_mask,
             reason,
-            mut_id
+            mut_id,
         )
         mut_num: int = len(self.mutation_list)
         self.mutation_list.append(splice_site_mut)
@@ -2431,7 +2903,6 @@ class ProcessedSegment:
             self.acc_mutation_counter += 1
         else:
             self.donor_mutation_counter += 1
-
 
     def _check_deleted_intron(
         self, donor: int, acc: int, donor_exon: int, acc_exon: int
@@ -2443,7 +2914,7 @@ class ProcessedSegment:
         * output[1] defines whether a short intron was erroneously introduced by
           CESAR, and acceptor site needs backtracking
         """
-        if self.reference[donor+1] == '>' and self.reference[acc-1] == '>':
+        if self.reference[donor + 1] == ">" and self.reference[acc - 1] == ">":
             return (True, False)
         donor_portion: int = self.exon2portion[donor_exon]
         acc_portion: int = self.exon2portion[acc_exon]
@@ -2482,7 +2953,9 @@ class ProcessedSegment:
             post_split_counter += int(is_symbol(self.reference[j]))
             if post_split_counter == 3 - phase - int(central is not None):
                 break
-        new_split_codon: str = (self.query[i:donor] + self.query[acc:j]).replace('-', '')
+        new_split_codon: str = (self.query[i:donor] + self.query[acc:j]).replace(
+            "-", ""
+        )
         for codon in parts(new_split_codon, 3):
             if codon.upper() in STOPS:
                 return True
@@ -2502,12 +2975,12 @@ class ProcessedSegment:
     def _rescue_alternative_start(self) -> int:
         """Searches for an alternative upstream start codon for the first exon"""
         first_codon_start: int = self.rel_exon_coords[1]
-        if self.query[first_codon_start:first_codon_start+3].upper() == START:
+        if self.query[first_codon_start : first_codon_start + 3].upper() == START:
             return
-        if self.reference[first_codon_start:first_codon_start+3].upper() != START:
+        if self.reference[first_codon_start : first_codon_start + 3].upper() != START:
             return
         for i in range(first_codon_start - 3, 0, -3):
-            codon: str = self.query[i:i+3]
+            codon: str = self.query[i : i + 3]
             if codon.upper() == START:
                 self.rel_exon_coords[1].start = i
                 self.abs_exon_coords[1].start = self._abs_coord(i, exon=1)
@@ -2518,19 +2991,21 @@ class ProcessedSegment:
         if self.exon_num in self.unaligned_exons:
             return
         last_codon_stop: int = self.rel_exon_coords[self.exon_num].stop
-        last_query_triplet: str = self.query[last_codon_stop-3:last_codon_stop]
+        last_query_triplet: str = self.query[last_codon_stop - 3 : last_codon_stop]
         if last_query_triplet in STOPS:
             return
         if last_query_triplet.upper() == NNN_CODON:
             return
-        if self.reference[last_codon_stop-3:last_codon_stop] not in STOPS:
+        if self.reference[last_codon_stop - 3 : last_codon_stop] not in STOPS:
             return
         for i in range(last_codon_stop, len(self.query), 3):
-            codon: str = self.query[i:i+3]
+            codon: str = self.query[i : i + 3]
             if codon.upper() in STOPS:
                 self.rel_exon_coords[self.exon_num].stop = i + 3
                 self.clipped_rel_coords[self.exon_num].stop = i + 3
-                self.abs_exon_coords[self.exon_num].stop = self._abs_coord(i + 3, exon=self.exon_num)
+                self.abs_exon_coords[self.exon_num].stop = self._abs_coord(
+                    i + 3, exon=self.exon_num
+                )
                 self.stop_updated = True
                 return
 
@@ -2557,18 +3032,18 @@ class ProcessedSegment:
         start_loss: Mutation = Mutation(
             self.transcript,
             self.exon2chain[1],
-            1, ## exon number
-            1, ## codon number
-            1, ## reference codon number
+            1,  ## exon number
+            1,  ## codon number
+            1,  ## reference codon number
             # *self._codon2coords(1),
             chrom,
             start,
             end,
             START_MISSING,
-            f'{ref_codon}->{query_codon}',
-            True, ## start loss is not considered to be inactivating and is masked by default
-            'Missing start masked',
-            'START_1'
+            f"{ref_codon}->{query_codon}",
+            True,  ## start loss is not considered to be inactivating and is masked by default
+            "Missing start masked",
+            "START_1",
         )
         mut_num: int = len(self.mutation_list)
         self.mutation_list.append(start_loss)
@@ -2576,7 +3051,11 @@ class ProcessedSegment:
         self.ref_codon2mutations[1].append(mut_num)
 
     def _check_for_frameshift(
-        self, codon: int, ref_codon: str = None, query_codon: str = None, exon: int = None
+        self,
+        codon: int,
+        ref_codon: str = None,
+        query_codon: str = None,
+        exon: int = None,
     ) -> None:
         """
         Checks whether the provided codon contains a frameshifting mutation
@@ -2589,8 +3068,8 @@ class ProcessedSegment:
             query_codon: str = self.query_codons_to_mask.get(
                 codon, self.all_query_codons[codon]
             )
-        ref_gap_num: int = ref_codon.count('-')
-        query_gap_num: int = query_codon.count('-')
+        ref_gap_num: int = ref_codon.count("-")
+        query_gap_num: int = query_codon.count("-")
         delta: int = ref_gap_num - query_gap_num
         ## return if there is no frameshift in the codon
         if not delta % 3:
@@ -2601,10 +3080,10 @@ class ProcessedSegment:
                 split_structure: Dict[int, int] = self.split_codon_struct[codon]
                 sub_start: int = 0
                 for ex, portion in split_structure.items():
-                    ref_sub: str = ref_codon[sub_start:sub_start + portion]
-                    query_sub: str = query_codon[sub_start:sub_start + portion]
-                    sub_ref_gap_num: int = ref_sub.count('-')
-                    sub_query_gap_num: int = query_sub.count('-')
+                    ref_sub: str = ref_codon[sub_start : sub_start + portion]
+                    query_sub: str = query_codon[sub_start : sub_start + portion]
+                    sub_ref_gap_num: int = ref_sub.count("-")
+                    sub_query_gap_num: int = query_sub.count("-")
                     if sub_ref_gap_num != sub_query_gap_num:
                         exon = ex
                         if ex != min(split_structure):
@@ -2614,7 +3093,7 @@ class ProcessedSegment:
                 if exon is None:
                     ## if mutations affects both exons sharing the split codon,
                     ## arbitrarily assign it to the downstream exon
-                    exon = ex ## TODO: Should it be assigned to both/all three exons instead?
+                    exon = ex  ## TODO: Should it be assigned to both/all three exons instead?
                     downstream = True
             else:
                 exon: int = next(self._codon2exon(codon))
@@ -2642,7 +3121,7 @@ class ProcessedSegment:
         ref_codon_num: int = self.triplet2ref_codon[codon]
         description: str = str(delta)
         mutation_class: str = FS_INS if delta > 0 else FS_DEL
-        mutation_id: str = f'FS_{self.frameshift_counter}'
+        mutation_id: str = f"FS_{self.frameshift_counter}"
         frameshift: Mutation = Mutation(
             self.transcript,
             self.exon2chain[exon],
@@ -2655,9 +3134,9 @@ class ProcessedSegment:
             end,
             mutation_class,
             description,
-            False, ## Point mutations are added unmasked by default
-            '-', ## with no masking reasons provided
-            mutation_id
+            False,  ## Point mutations are added unmasked by default
+            "-",  ## with no masking reasons provided
+            mutation_id,
         )
         mut_num: int = len(self.mutation_list)
         self.mutation_list.append(frameshift)
@@ -2670,7 +3149,7 @@ class ProcessedSegment:
         codon: int,
         ref_codon: str = None,
         query_codon: str = None,
-        exon: int = None
+        exon: int = None,
     ) -> None:
         """Checks if the provided codon is a premature stop codon"""
         if ref_codon is None:
@@ -2696,9 +3175,13 @@ class ProcessedSegment:
                 split_structure: Dict[int, int] = self.split_codon_struct[codon]
                 sub_start: int = 0
                 for ex, portion in split_structure.items():
-                    ref_sub: str = ref_codon[sub_start:sub_start + portion]
-                    query_sub: str = query_codon[sub_start:sub_start + portion]
-                    ref_sub: str = ref_codon[0:sub_start] + query_sub + ref_codon[sub_start+portion:]
+                    ref_sub: str = ref_codon[sub_start : sub_start + portion]
+                    query_sub: str = query_codon[sub_start : sub_start + portion]
+                    ref_sub: str = (
+                        ref_codon[0:sub_start]
+                        + query_sub
+                        + ref_codon[sub_start + portion :]
+                    )
                     if ref_sub in STOPS:
                         exon = ex
                         if ex != min(split_structure):
@@ -2709,16 +3192,16 @@ class ProcessedSegment:
                     ## if mutations affects both exons sharing the split codon,
                     ## arbitrarily assign it to the downstream exon
                     downstream = True
-                    exon = ex ## TODO: Should it be assigned to both/all three exons instead?
+                    exon = ex  ## TODO: Should it be assigned to both/all three exons instead?
             else:
                 exon: int = next(self._codon2exon(codon))
         if exon in self.unaligned_exons:
             return
         ref_num_codon: int = self.triplet2ref_codon[codon]
         if ref_codon == NNN_CODON:
-            is_masked, reason = True, 'Reference codon masked'
+            is_masked, reason = True, "Reference codon masked"
         else:
-            is_masked, reason = False, '-'
+            is_masked, reason = False, "-"
         chrom: str = self.exon2chrom[exon]
         strand: bool = self._exon2strand(exon)
         if strand:
@@ -2738,8 +3221,8 @@ class ProcessedSegment:
             else:
                 end: int = max(self.triplet_coordinates[codon])
                 start: int = max(0, end - 1)
-        description: str = f'{ref_codon}->{query_codon}'
-        mut_id: str = f'STOP_{self.nonsense_counter}'
+        description: str = f"{ref_codon}->{query_codon}"
+        mut_id: str = f"STOP_{self.nonsense_counter}"
         nonsense: Mutation = Mutation(
             self.transcript,
             self.exon2chain[exon],
@@ -2754,7 +3237,7 @@ class ProcessedSegment:
             description,
             is_masked,
             reason,
-            mut_id
+            mut_id,
         )
         mut_num: int = len(self.mutation_list)
         self.mutation_list.append(nonsense)
@@ -2772,28 +3255,30 @@ class ProcessedSegment:
         for i in range(first_exon, last_exon + 1):
             if i in self.unaligned_exons:
                 return
-        first_ref_codon: int = self.triplet2ref_codon[first_codon] ## TODO: Implement
+        first_ref_codon: int = self.triplet2ref_codon[first_codon]  ## TODO: Implement
         last_ref_codon: int = self.triplet2ref_codon[codon]
         first_chain: str = self.exon2chain[first_exon]
         # last_chain: str = self.exon2chain[last_exon]
         # chain_label: str = f'{first_chain}_{last_chain}'
         first_chrom: str = self.exon2chrom[first_exon]
         last_chrom: str = self.exon2chrom[last_exon]
-        chrom_label: str = f'{first_chrom}_{last_chrom}'
+        chrom_label: str = f"{first_chrom}_{last_chrom}"
         first_codon_strand: bool = self._exon2strand(first_exon)
         last_codon_strand: bool = self._exon2strand(last_exon)
         min_annot_codon: int = self._min_annot_codon()
         if first_codon < min_annot_codon:
-            start = (min if first_codon_strand else max)(self.triplet_coordinates[min_annot_codon])
+            start = (min if first_codon_strand else max)(
+                self.triplet_coordinates[min_annot_codon]
+            )
         else:
             start = min(self.triplet_coordinates[first_codon])
         stop: int = (max if last_codon_strand else min)(self.triplet_coordinates[codon])
         start, stop = sorted((start, stop))
-        exon_label: str = f'{first_exon}_{last_exon}'
-        codon_label: str = f'{first_codon}_{codon}'
-        ref_codon_label: str = f'{first_ref_codon}_{last_ref_codon}'
-        description: str = f'+{length*3}' if insertion else f'-{length*3}'
-        mut_id: str = f'BI_{self.indel_counter}'
+        exon_label: str = f"{first_exon}_{last_exon}"
+        codon_label: str = f"{first_codon}_{codon}"
+        ref_codon_label: str = f"{first_ref_codon}_{last_ref_codon}"
+        description: str = f"+{length * 3}" if insertion else f"-{length * 3}"
+        mut_id: str = f"BI_{self.indel_counter}"
         indel: Mutation = Mutation(
             self.transcript,
             # chain_label,
@@ -2806,9 +3291,9 @@ class ProcessedSegment:
             stop,
             BIG_INS if insertion else BIG_DEL,
             description,
-            True, ## for compliance with the default no_fpi mode of TOGA 1.0 #False,
-            '-',
-            mut_id
+            True,  ## for compliance with the default no_fpi mode of TOGA 1.0 #False,
+            "-",
+            mut_id,
         )
         mut_num: int = len(self.mutation_list)
         self.mutation_list.append(indel)
@@ -2820,7 +3305,7 @@ class ProcessedSegment:
                 self.ref_codon2mutations[ref_c].append(mut_num)
 
     def _check_for_stop_loss(self) -> None:
-        """For the last codon, determine if it is a valid stop codon """
+        """For the last codon, determine if it is a valid stop codon"""
         last_codon: int = max(self.all_query_codons)
         query_codon: str = self.query_codons_to_mask.get(
             last_codon, self.all_query_codons[last_codon]
@@ -2831,7 +3316,9 @@ class ProcessedSegment:
             last_codon, self.all_ref_codons[last_codon]
         )
         reason: str = (
-            'Non-canonical stop in reference' if ref_codon not in STOPS else 'Missing stop masked'
+            "Non-canonical stop in reference"
+            if ref_codon not in STOPS
+            else "Missing stop masked"
         )
         exon: int = self.exon_num
         if exon in self.unaligned_exons:
@@ -2856,10 +3343,10 @@ class ProcessedSegment:
             start,
             end,
             STOP_MISSING,
-            f'{ref_codon}->{query_codon}',
-            True, ## for now, stop loss is not considered to be an inactivating mutation,
+            f"{ref_codon}->{query_codon}",
+            True,  ## for now, stop loss is not considered to be an inactivating mutation,
             reason,
-            'STOP_LOSS_1'
+            "STOP_LOSS_1",
         )
         mut_num: int = len(self.mutation_list)
         self.mutation_list.append(stop_loss)
@@ -2895,7 +3382,7 @@ class ProcessedSegment:
             abs_nid += _nid
             ref_exon_len += _exon_len
             _blosum_self: float = self.blosum_self_values[ex]
-            _blosum_diff: float  = self.blosum_diff_values[ex]
+            _blosum_diff: float = self.blosum_diff_values[ex]
             if _blosum_self is None or _blosum_diff is None:
                 if ex in self.unaligned_exons:
                     _blosum_self: float = 0.0
@@ -2905,17 +3392,17 @@ class ProcessedSegment:
                     first_codon: int = ref_codons[0]
                     first_triplet: int = min(self.ref_codon2triplets[first_codon])
                     last_triplet: int = max(self.ref_codon2triplets[first_codon])
-                    ref_only_codon: int = ''.join(
-                        self.ref_codons_to_mask.get(
-                            x, self.all_ref_codons[x]
-                        ) for x in range(first_triplet, last_triplet + 1)
+                    ref_only_codon: int = "".join(
+                        self.ref_codons_to_mask.get(x, self.all_ref_codons[x])
+                        for x in range(first_triplet, last_triplet + 1)
                     )
-                    query_only_codon: int = ''.join(
-                        self.query_codons_to_mask.get(
-                            x, self.all_query_codons[x]
-                        ) for x in range(first_triplet, last_triplet + 1)
+                    query_only_codon: int = "".join(
+                        self.query_codons_to_mask.get(x, self.all_query_codons[x])
+                        for x in range(first_triplet, last_triplet + 1)
                     )
-                    ref_aa, query_aa = next(process_and_translate(ref_only_codon, query_only_codon)) ## NEEDS TESTING
+                    ref_aa, query_aa = next(
+                        process_and_translate(ref_only_codon, query_only_codon)
+                    )  ## NEEDS TESTING
                     _blosum_self = get_blosum_score(ref_aa, ref_aa, self.matrix)
                     _blosum_diff = get_blosum_score(ref_aa, query_aa, self.matrix)
             blosum_self += _blosum_self
@@ -2928,14 +3415,13 @@ class ProcessedSegment:
         if len(merged_exons) == 1:
             query_seq: str = self._exon_seq(exon, ref=False)
             total_len: int = len(query_seq)
-            defined_len: int = total_len - query_seq.upper().count('N')
+            defined_len: int = total_len - query_seq.upper().count("N")
             if (defined_len / total_len) < 0.1:
                 self._to_log(
-                    'Exon %s has only %.3f %% of its sequence defined; classifying it as Missing' % (
-                        exon, (defined_len / total_len) * 100
-                    )
+                    "Exon %s has only %.3f %% of its sequence defined; classifying it as Missing"
+                    % (exon, (defined_len / total_len) * 100)
                 )
-                self.exon_presence[exon] = 'M'
+                self.exon_presence[exon] = "M"
                 if exon in self.unaligned_exons:
                     start, end = 0, 0
                 else:
@@ -2944,15 +3430,15 @@ class ProcessedSegment:
                     self.transcript,
                     self.exon2chain[exon],
                     exon,
-                    f'{first_codon}_{last_codon}',
-                    f'{first_ref_codon}_{last_ref_codon}',
+                    f"{first_codon}_{last_codon}",
+                    f"{first_ref_codon}_{last_ref_codon}",
                     self.exon2chrom[exon],
                     *self.abs_exon_coords[exon].tuple(),
                     MISS_EXON,
-                    '-',
-                    False, ## missing exon entries are not masked
-                    '-', ## therefore, the reason slot is kept empty
-                    f'MIS_{self.missing_exon_counter}'
+                    "-",
+                    False,  ## missing exon entries are not masked
+                    "-",  ## therefore, the reason slot is kept empty
+                    f"MIS_{self.missing_exon_counter}",
                 )
                 self.missing_exon_counter += 1
                 return
@@ -2962,60 +3448,70 @@ class ProcessedSegment:
         is_defined: bool = exon not in self.gap_located_exons
         has_aln_data: bool = is_present and is_real and is_defined
         if has_aln_data:
-            overlaps_locus: bool = intersection(
-                *self.abs_exon_coords[exon].tuple(), *self.expected_coordinates[exon]
-            ) > 0
+            overlaps_locus: bool = (
+                intersection(
+                    *self.abs_exon_coords[exon].tuple(),
+                    *self.expected_coordinates[exon],
+                )
+                > 0
+            )
         else:
             overlaps_locus: bool = False
-        if overlaps_locus:# or not is_defined:
+        if overlaps_locus:  # or not is_defined:
             self.found_in_exp_locus[exon] = True
-        if (has_aln_data and overlaps_locus):
-            self._to_log(f'Exon {exon} is found in its expected locus')
-            self.exon_presence[exon] = 'I'
+        if has_aln_data and overlaps_locus:
+            self._to_log(f"Exon {exon} is found in its expected locus")
+            self.exon_presence[exon] = "I"
             return
         ## Checkpoint 2: For exons with no chained-defined locus,
         ## check if they exceed quality thresholds
-        ## TODO: The comparison can be moved to a separate function 
+        ## TODO: The comparison can be moved to a separate function
         ## to be executed within process()
         if nid >= MIN_ID_THRESHOLD and blosum >= MIN_BLOSUM_THRESHOLD:
-            self._to_log(f'Exon {exon} has sufficient identity values')
-            self.exon_presence[exon] = 'I'
+            self._to_log(f"Exon {exon} has sufficient identity values")
+            self.exon_presence[exon] = "I"
             return
         ## Checkpoint 3: If both splice site locations are supported by
         ## SpliceAI predictions, the exon is still worth saving
         sai_acc_support: bool = (
-            self.spliceai_acc_support[min(merged_exons)] or
-            min(merged_exons) == max(merged_exons) == 1 != self.exon_num
+            self.spliceai_acc_support[min(merged_exons)]
+            or min(merged_exons) == max(merged_exons) == 1 != self.exon_num
         )
         sai_donor_support: bool = (
-            self.spliceai_donor_support[max(merged_exons)] or
-            max(merged_exons) == min(merged_exons) == self.exon_num != 1
+            self.spliceai_donor_support[max(merged_exons)]
+            or max(merged_exons) == min(merged_exons) == self.exon_num != 1
         )
         if sai_acc_support and sai_donor_support:
-            self._to_log(f'Exon boundaries are supported by SpliceAI for exon {exon}')
-            self.exon_presence[exon] = 'I'
+            self._to_log(f"Exon boundaries are supported by SpliceAI for exon {exon}")
+            self.exon_presence[exon] = "I"
             return
         ## Checkpoint 4: Exons reaching this point are absent from the alignment;
         ## those which lie in the vicinity of alignment gaps are classified as
         ## missing, otherwise they are marked as deleted
         first_codon, last_codon = self.exon2codons[exon]
         first_ref_codon, last_ref_codon = self.exon2ref_codons[exon]
-        if self.intersects_gap[exon] or self.exon2asmgaps[exon] or exon in self.out_of_chain_exons:
+        if (
+            self.intersects_gap[exon]
+            or self.exon2asmgaps[exon]
+            or exon in self.out_of_chain_exons
+        ):
             if self.intersects_gap[exon] or self.exon2asmgaps[exon]:
                 self._to_log(
                     (
-                        'Search space for exon %i contains assembly gap; '
-                        'marking exon %i as missing'
-                    ) % (exon, exon)
+                        "Search space for exon %i contains assembly gap; "
+                        "marking exon %i as missing"
+                    )
+                    % (exon, exon)
                 )
             else:
                 self._to_log(
                     (
-                        'Exon %i falls outside of the subchain; '
-                        'marking exon %i as missing'
-                    ) % (exon, exon)
+                        "Exon %i falls outside of the subchain; "
+                        "marking exon %i as missing"
+                    )
+                    % (exon, exon)
                 )
-            self.exon_presence[exon] = 'M'
+            self.exon_presence[exon] = "M"
             if exon in self.unaligned_exons:
                 start, end = 0, 0
             else:
@@ -3024,34 +3520,34 @@ class ProcessedSegment:
                 self.transcript,
                 self.exon2chain[exon],
                 exon,
-                f'{first_codon}_{last_codon}',
-                f'{first_ref_codon}_{last_ref_codon}',
+                f"{first_codon}_{last_codon}",
+                f"{first_ref_codon}_{last_ref_codon}",
                 self.exon2chrom[exon],
                 start,
                 end,
                 MISS_EXON,
-                '-',
-                False, ## missing exon entries are not masked
-                '-', ## therefore, the reason slot is kept empty
-                f'MIS_{self.missing_exon_counter}'
+                "-",
+                False,  ## missing exon entries are not masked
+                "-",  ## therefore, the reason slot is kept empty
+                f"MIS_{self.missing_exon_counter}",
             )
             self.missing_exon_counter += 1
         else:
-            self._to_log(f'Exon {exon} is deleted from the {self.name} projection')
+            self._to_log(f"Exon {exon} is deleted from the {self.name} projection")
             is_terminal: bool = exon == 1 or exon == self.exon_num
             is_short: bool = self.ref_exon_lengths[exon] < TERMINAL_EXON_DEL_SIZE
             deletion_masked: bool = False
-            reason_for_masking: str = '-'
-            presence_class: str = 'D'
+            reason_for_masking: str = "-"
+            presence_class: str = "D"
             mut_class: str = DEL_EXON
-            mut_id: str = f'DEL_{self.deleted_exon_counter}'
+            mut_id: str = f"DEL_{self.deleted_exon_counter}"
             if is_terminal and is_short:
-                presence_class = 'M'
+                presence_class = "M"
                 mut_class = MISS_EXON
-                mut_id = f'MDEL_{self.mdel_counter}'
+                mut_id = f"MDEL_{self.mdel_counter}"
             elif not self.ref_exon_lengths[exon] % 3 and self.exon_num > 1:
                 deletion_masked: bool = True
-                reason_for_masking: str = 'Frame-preserving deletion'
+                reason_for_masking: str = "Frame-preserving deletion"
                 self.deletion2mask[exon] = True
             else:
                 self.deletion2mask[exon] = False
@@ -3060,20 +3556,20 @@ class ProcessedSegment:
                 self.transcript,
                 self.exon2chain[exon],
                 exon,
-                f'{first_codon}_{last_codon}',
-                f'{first_ref_codon}_{last_ref_codon}',
+                f"{first_codon}_{last_codon}",
+                f"{first_ref_codon}_{last_ref_codon}",
                 self.exon2chrom[exon],
                 *self.abs_exon_coords[exon].tuple(),
                 mut_class,
-                '-',
+                "-",
                 deletion_masked,
                 reason_for_masking,
-                mut_id
+                mut_id,
             )
-            if 'MDEL' in mut_id:
+            if "MDEL" in mut_id:
                 self.mdel_counter += 1
             else:
-                self.deleted_exon_counter +=1
+                self.deleted_exon_counter += 1
         self.mutation_list.append(mutation)
         mut_num: int = len(self.mutation_list) - 1
         for codon in range(first_codon, last_codon):
@@ -3096,14 +3592,14 @@ class ProcessedSegment:
         , splice pairs are (1,2), (2,5), (5,8), and (8,10)
         """
         output: List[Tuple[int, int]] = []
-        from_: int =  None
+        from_: int = None
         for exon, status in self.exon_presence.items():
-            if status == 'M': 
+            if status == "M":
                 ## unset the pair start since M exons disrupt pairs
                 from_ = None
                 continue
-            if status == 'I':
-                if from_: 
+            if status == "I":
+                if from_:
                     ## add a pair of spliced exons
                     output.append((from_, exon))
                 ## set a new pair start to the current exon
@@ -3115,11 +3611,13 @@ class ProcessedSegment:
         After exon classification and deleted exon exclusion,
         checks novel spliced exons for potential mutations in the split codons
         """
-        if self.exon_num == 1: ## irrelevant for single-exon transcripts
+        if self.exon_num == 1:  ## irrelevant for single-exon transcripts
             return
         splice_pairs: List[Tuple[int, int]] = self._get_splice_pairs()
         for from_, to_ in splice_pairs:
-            if from_ + 1 == to_: ## the site has been already analysed during .process()
+            if (
+                from_ + 1 == to_
+            ):  ## the site has been already analysed during .process()
                 continue
             ## reconstruct the respective split codons
             donor_codon_num: int = self.exon2codons[from_][1]
@@ -3127,7 +3625,7 @@ class ProcessedSegment:
                 donor_codon_num, self.all_query_codons[donor_codon_num]
             )
             donor_portion: int = self.split_codon_struct[donor_codon_num][from_]
-            donor_split: str = ''
+            donor_split: str = ""
             for i in donor_codon:
                 donor_split += i
                 if sum([x.isalpha() for x in donor_split]) != donor_portion:
@@ -3138,7 +3636,7 @@ class ProcessedSegment:
                 acc_codon_num, self.all_query_codons[acc_codon_num]
             )
             acc_portion: int = self.split_codon_struct[acc_codon_num][to_]
-            acc_split: str = ''
+            acc_split: str = ""
             for j in acc_codon[::-1]:
                 acc_split += j
                 if sum([x.isalpha() for x in acc_split]) != acc_portion:
@@ -3148,8 +3646,8 @@ class ProcessedSegment:
             ## compare the resulting codon to the latter split codon in the reference
             ref_codon: str = self.all_ref_codons[acc_codon_num]
             ## check the resulting codon
-            restored_codon: str = (donor_split + acc_split).replace('-', '')
-            if restored_codon == '':
+            restored_codon: str = (donor_split + acc_split).replace("-", "")
+            if restored_codon == "":
                 continue
             for sub in parts(restored_codon, 3):
                 curr_mut_num: int = len(self.mutation_list)
@@ -3170,8 +3668,8 @@ class ProcessedSegment:
         sequence
         """
         len_till_codon: int = 0
-        for c in range(1, codon + 1): 
-            ## TODO: +1 added for the sake of compliance with 1.0; 
+        for c in range(1, codon + 1):
+            ## TODO: +1 added for the sake of compliance with 1.0;
             ## I believe this is likely a bug on the 1.0's side
             codon_seq: str = self.ref_codons_to_mask.get(c, self.all_ref_codons[c])
             len_till_codon += sum(x.isalpha() for x in codon_seq)
@@ -3208,24 +3706,26 @@ class ProcessedSegment:
         if first_ten_condition or codon_in_last_ten:
             ## mask the mutation if it falls within the first/last 10%,
             ## calculate the actual portion it falls in
-            terminus: str = 'N' if codon_in_first_ten else 'C'
-            return True, f'{terminus}-terminal {portion}%'
+            terminus: str = "N" if codon_in_first_ten else "C"
+            return True, f"{terminus}-terminal {portion}%"
         to_mask: bool = any(
             (
-                x  for x in self.query_atgs if x > codon and
-                self.triplet2ref_codon[x] <= first_ten
+                x
+                for x in self.query_atgs
+                if x > codon and self.triplet2ref_codon[x] <= first_ten
             )
         )
-        return (
-            to_mask,
-            'Alternative start found' if to_mask else '-'
-        )
+        return (to_mask, "Alternative start found" if to_mask else "-")
 
     def _restored_frame_mut(self, mut: Mutation) -> bool:
         comp_mut: bool = mut.mutation_class == COMPENSATION
-        exon_nums: Iterable[int] = [mut.exon] if isinstance(mut.exon, int) else map(int, mut.exon.split('_'))
+        exon_nums: Iterable[int] = (
+            [mut.exon] if isinstance(mut.exon, int) else map(int, mut.exon.split("_"))
+        )
         exon_frame_corr: bool = any(self.corrected_frame[x] for x in exon_nums)
-        is_in_alt_frame: bool = exon_frame_corr and mut.masking_reason == ALT_FRAME_REASON
+        is_in_alt_frame: bool = (
+            exon_frame_corr and mut.masking_reason == ALT_FRAME_REASON
+        )
         is_comp: bool = exon_frame_corr and mut.masking_reason == COMPENSATION_REASON
         return comp_mut or is_comp or is_in_alt_frame
 
@@ -3236,31 +3736,30 @@ class ProcessedSegment:
         2) was caused by splice site shift;
         3) corresponds to intron gain or precise intron deletion;
         """
-        if mut.masking_reason == 'Intron deletion':
+        if mut.masking_reason == "Intron deletion":
             return True
         if mut.mutation_class == INTRON_GAIN:
-            return True 
+            return True
         if self._restored_frame_mut(mut):
             return True
         if mut.masking_reason in SAFE_SPLICE_SITE_REASONS:
             return True
         if mut.mutation_class in BIG_INDEL:
             return True
-        if mut.masking_reason == COMPENSATION_REASON: ## TODO: Would this be correct?
+        if mut.masking_reason == COMPENSATION_REASON:  ## TODO: Would this be correct?
             comp_num: int = self.frameshift2compensation[num]
-            ## check if it's a deprecated (unmasked) compensation   
+            ## check if it's a deprecated (unmasked) compensation
             if comp_num in self.comps_to_delete:
                 return False
             ## check if it's a SpliceAI-corrected compensation
             if comp_num in self.spliceai_compensations:
                 return True
             frameshifts: List[Mutation] = [
-                x for i,x in enumerate(self.mutation_list)
+                x
+                for i, x in enumerate(self.mutation_list)
                 if self.frameshift2compensation.get(i, -1) == comp_num
             ]
-            return any(
-                self._in_modified_seq(x.exon, x.codon) for x in frameshifts
-            )
+            return any(self._in_modified_seq(x.exon, x.codon) for x in frameshifts)
         return False
 
     def _alt_loss_status(self, status: str) -> str:
@@ -3290,37 +3789,51 @@ class ProcessedSegment:
         if ref:
             seq: str = self.reference[cesar_start:cesar_stop]
             if adj_start < cesar_start:
-                seq = '-' * (cesar_start - adj_start) + seq
+                seq = "-" * (cesar_start - adj_start) + seq
             if adj_stop > cesar_stop:
                 if exon == self.exon_num and self.stop_updated:
                     init_stop: str = seq[-3:]
-                    seq = seq[:-3] + '-' * (adj_stop - cesar_stop - 3) + init_stop
+                    seq = seq[:-3] + "-" * (adj_stop - cesar_stop - 3) + init_stop
                 else:
-                    seq += '-' * (adj_stop - cesar_stop)
+                    seq += "-" * (adj_stop - cesar_stop)
         else:
             start: int = min(cesar_start, adj_start)
             stop: int = max(cesar_stop, adj_stop)
             seq: str = self.query[start:stop]
             if adj_start != cesar_start:
                 if adj_start > cesar_start:
-                    seq = '-' * (adj_start - cesar_start) + seq[(adj_start - cesar_start):]
+                    seq = (
+                        "-" * (adj_start - cesar_start)
+                        + seq[(adj_start - cesar_start) :]
+                    )
                 else:
-                    seq = seq[:(cesar_start-start)].upper() + seq[(cesar_start-start):]
+                    seq = (
+                        seq[: (cesar_start - start)].upper()
+                        + seq[(cesar_start - start) :]
+                    )
             if adj_stop != cesar_stop:
                 if adj_stop < cesar_stop:
-                    seq = seq[:-(cesar_stop - adj_stop)] + '-' * (cesar_stop - adj_stop)
+                    seq = seq[: -(cesar_stop - adj_stop)] + "-" * (
+                        cesar_stop - adj_stop
+                    )
                 else:
                     if exon == self.exon_num and self.stop_updated:
-                        seq = seq[:-(adj_stop - cesar_stop + 3)] + seq[-(adj_stop - cesar_stop):].upper()
+                        seq = (
+                            seq[: -(adj_stop - cesar_stop + 3)]
+                            + seq[-(adj_stop - cesar_stop) :].upper()
+                        )
                     else:
-                        seq = seq[:-(adj_stop - cesar_stop)] + seq[-(adj_stop - cesar_stop):].upper()
+                        seq = (
+                            seq[: -(adj_stop - cesar_stop)]
+                            + seq[-(adj_stop - cesar_stop) :].upper()
+                        )
         return seq
 
     def _cds_seq(self) -> str:
         """
-        Retrieves the complete nucleotide coding sequence for the query 
+        Retrieves the complete nucleotide coding sequence for the query
         """
-        cds: str = ''
+        cds: str = ""
         for exon in range(1, self.exon_num + 1):
             exon_seq: str = self._exon_seq(exon, ref=False)
             exon_seq = strip_noncoding(exon_seq, uppercase_only=True)
@@ -3340,13 +3853,13 @@ class ProcessedSegment:
                 break
             frame_changed = True
         if frame_changed:
-            codon_seq: str = ''.join(
-                self.query_codons_to_mask.get(x, self.all_query_codons[x]).upper() 
+            codon_seq: str = "".join(
+                self.query_codons_to_mask.get(x, self.all_query_codons[x]).upper()
                 for x in self.all_query_codons
-            ).replace('-', '')
+            ).replace("-", "")
             if not (len(codon_seq) % 3):
-                return ''.join(AA_CODE.get(x, 'X') for x in parts(codon_seq, 3))
-        return ''.join(x for x in self.query_aa_seq.values() if x != '-')
+                return "".join(AA_CODE.get(x, "X") for x in parts(codon_seq, 3))
+        return "".join(x for x in self.query_aa_seq.values() if x != "-")
 
     def _intact_exon_portion(self) -> Tuple[int, float]:
         """
@@ -3359,7 +3872,7 @@ class ProcessedSegment:
             if mut.masking_reason in SAFE_UNMASKABLE_REASONS:
                 continue
             if isinstance(mut.exon, str):
-                first, last = map(int, mut.exon.split('_'))
+                first, last = map(int, mut.exon.split("_"))
                 for x in range(first, last + 1):
                     affected_exons.add(x)
             else:
@@ -3391,13 +3904,16 @@ class ProcessedSegment:
                 self._exon_aln_for_browser(exon) for exon in range(1, self.exon_num + 1)
             ]
         chains: List[str] = sorted(
-            self.chains, key=lambda x: min([y for y,z in self.exon2chain.items() if z == x ])
+            self.chains,
+            key=lambda x: min([y for y, z in self.exon2chain.items() if z == x]),
         )
         fragmented: bool = len(chains) > 1
         fragment_id: int = 1
-        for chain in chains:#self.chains:
+        for chain in chains:  # self.chains:
             exons: List[int] = [
-                exon for exon in range(1, self.exon_num + 1) if self.exon2chain[exon] == chain
+                exon
+                for exon in range(1, self.exon_num + 1)
+                if self.exon2chain[exon] == chain
             ]
             if not exons and len(self.chains) > 1:
                 continue
@@ -3411,10 +3927,10 @@ class ProcessedSegment:
             last_exon: int = 0
             for exon in exons:
                 portion: int = self.exon2portion[exon]
-                if not raw and self.exon_presence[exon] != 'I':
+                if not raw and self.exon_presence[exon] != "I":
                     ex_num -= 1
                     continue
-                exon_seq: str = self._exon_seq(exon, ref=False).replace('-', '')
+                exon_seq: str = self._exon_seq(exon, ref=False).replace("-", "")
                 if exon in self.unaligned_exons or not len(exon_seq):
                     ex_num -= 1
                     continue
@@ -3426,7 +3942,8 @@ class ProcessedSegment:
                     sub_exons: List[int] = [
                         sorted(
                             map(lambda x: self._abs_coord(x, portion=portion), x[:2])
-                        ) for x in self.introns_gained[exon]
+                        )
+                        for x in self.introns_gained[exon]
                     ]
                     rel_start, rel_stop = self.rel_exon_coords[exon].tuple()
                     if not strand:
@@ -3449,71 +3966,84 @@ class ProcessedSegment:
                         length: int = sub_stop - prev_start
                         if length <= 0:
                             raise ValueError(
-                                f'Non-positive length observed in exon {exon}'
+                                f"Non-positive length observed in exon {exon}"
                             )
                         lengths.append(length)
                     else:
                         length: int = sub_stop - sub_start
                         if length <= 0:
                             raise ValueError(
-                                f'Non-positive length observed in exon {exon}'
+                                f"Non-positive length observed in exon {exon}"
                             )
                         lengths.append(length)
                         starts.append(sub_start - cds_start)
                     _stop = sub_stop
                 last_exon = exon
-            if not ex_num: ## possible only if all the exons were not aligned or are completely deleted
-                self._to_log('All exons for current fragment have been deleted')
+            if not ex_num:  ## possible only if all the exons were not aligned or are completely deleted
+                self._to_log("All exons for current fragment have been deleted")
                 continue
             cds_stop: int = self.abs_exon_coords[last_exon].tuple()[1]
-            lengths = ','.join(map(str, lengths)) + ','
-            starts = ','.join(map(str, starts)) + ','
-            score: str = str(chain) if browser else '0'
+            lengths = ",".join(map(str, lengths)) + ","
+            starts = ",".join(map(str, starts)) + ","
+            score: str = str(chain) if browser else "0"
             name: str = self.name
             if fragmented:
-                name += f'${fragment_id}'
+                name += f"${fragment_id}"
                 fragment_id += 1
             if self.is_paralog:
-                name += '#paralog'
+                name += "#paralog"
             if self.is_processed_pseudogene and self.loss_status in (FI, I):
-                name += '#retro'
+                name += "#retro"
             output: List[Any] = [
-                chrom, cds_start, cds_stop,
-                name, score,
-                '+' if strand else '-', cds_start, cds_stop, color,
-                ex_num, lengths, starts
+                chrom,
+                cds_start,
+                cds_stop,
+                name,
+                score,
+                "+" if strand else "-",
+                cds_start,
+                cds_stop,
+                color,
+                ex_num,
+                lengths,
+                starts,
             ]
             if browser:
                 protein_aln: str = self._aa_aln_for_browser()
-                plot: str = self.svg.replace('\n', '')
+                plot: str = self.svg.replace("\n", "")
                 mut_table: str = mutation_table(self.mutation_list)
-                exon_aln_field: str = ''.join(exon_alns)
+                exon_aln_field: str = "".join(exon_alns)
                 cds_field: str = self._cds_seq()
                 alt_prot_field: str = self._query_protein_seq()
                 affected_num, affected_percent = self._intact_exon_portion()
                 output.extend(
                     [
                         CLASS_TO_NAME[self.loss_status],
-                        self.longest_fraction_strict ,
-                        self.longest_fraction_relaxed, 
+                        self.longest_fraction_strict,
+                        self.longest_fraction_relaxed,
                         self.total_intact_fraction,
-                        '0.0',
+                        "0.0",
                         int(self.middle_is_intact),
                         int(self.middle_is_present),
-                        protein_aln, plot, mut_table, 
-                        exon_aln_field, cds_field, alt_prot_field,
-                        affected_num, affected_percent
+                        protein_aln,
+                        plot,
+                        mut_table,
+                        exon_aln_field,
+                        cds_field,
+                        alt_prot_field,
+                        affected_num,
+                        affected_percent,
                     ]
                 )
                 pass
-            yield '\t'.join(map(str, output))
+            yield "\t".join(map(str, output))
 
     def _aa_aln_for_browser(self) -> str:
         """
         Generates a protein alignment line for the UCSC report
         """
-        ref_seq: str = ''.join(self.ref_aa_seq.values())
-        query_seq: str = ''.join(self.query_aa_seq.values())
+        ref_seq: str = "".join(self.ref_aa_seq.values())
+        query_seq: str = "".join(self.query_aa_seq.values())
         return format_fasta_as_aln(ref_seq, query_seq, protein=True)
 
     def _orth_label(self) -> str:
@@ -3525,8 +4055,10 @@ class ProcessedSegment:
         return ORTHOLOG
 
     def _exon_aln_for_browser(self, exon: int) -> str:
-        ref_seq: str = self._exon_seq(exon, ref=True).replace('>', '-').replace(' ', '-')
-        query_seq: str = self._exon_seq(exon, ref=False).replace('>', '-')
+        ref_seq: str = (
+            self._exon_seq(exon, ref=True).replace(">", "-").replace(" ", "-")
+        )
+        query_seq: str = self._exon_seq(exon, ref=False).replace(">", "-")
         ## TODO: add splice sites
         chrom: str = self.exon2chrom[exon]
         start, end = self.abs_exon_coords[exon].tuple()
@@ -3537,8 +4069,17 @@ class ProcessedSegment:
         has_gap: bool = self.intersects_gap[exon] or self.exon2asmgaps[exon]
         aln_class: str = self.exon_quality[exon]
         header: str = exon_aln_header(
-            exon, chrom, start, end, exp_start, exp_end, 
-            found_in_exp, nuc_id, blosum, has_gap, aln_class
+            exon,
+            chrom,
+            start,
+            end,
+            exp_start,
+            exp_end,
+            found_in_exp,
+            nuc_id,
+            blosum,
+            has_gap,
+            aln_class,
         )
         return exon_aln_entry(ref_seq, query_seq, header)
 
@@ -3546,53 +4087,64 @@ class ProcessedSegment:
         """
         Returns the alignment processing results in the legacy format
         """
-        r_post: str = ' | REFERENCE'
-        q_post: str = ' | QUERY'
-        chains: str = ','.join(self.chains)
-        prot_name: str = f'>{self.name} | {chains} | PROT'
-        codon_name: str = f'>{self.name}| {chains} | CODON'
-        ref_exon_template: str = f'>{self.name} | {{}} | {{}} | reference_exon'
+        r_post: str = " | REFERENCE"
+        q_post: str = " | QUERY"
+        chains: str = ",".join(self.chains)
+        prot_name: str = f">{self.name} | {chains} | PROT"
+        codon_name: str = f">{self.name}| {chains} | CODON"
+        ref_exon_template: str = f">{self.name} | {{}} | {{}} | reference_exon"
         query_exon_template: str = (
-            f'>{self.name} | {{}} | {{}} | {{}}:{{}}-{{}} | {{}} | {{}} | N/A | '
-            'N/A | exp:N/A-N/A | N/A | False | query_exon'
+            f">{self.name} | {{}} | {{}} | {{}}:{{}}-{{}} | {{}} | {{}} | N/A | "
+            "N/A | exp:N/A-N/A | N/A | False | query_exon"
         )
         ref_prot: str = prot_name + r_post
         query_prot: str = prot_name + q_post
         ref_codon: str = codon_name + r_post
         query_codon: str = codon_name + q_post
         output: str = [
-            self.name, ref_prot, ''.join(self.ref_aa_seq.values()),
-            query_prot, ''.join(self.query_aa_seq.values()),
-            ref_codon, ' '.join(self.all_ref_codons.values()),
-            query_codon, ' '.join(self.all_query_codons.values())
+            self.name,
+            ref_prot,
+            "".join(self.ref_aa_seq.values()),
+            query_prot,
+            "".join(self.query_aa_seq.values()),
+            ref_codon,
+            " ".join(self.all_ref_codons.values()),
+            query_codon,
+            " ".join(self.all_query_codons.values()),
         ]
         for e in range(1, self.exon_num + 1):
             nuc_id: float = round(self.nuc_ids[e], 2)
             blosum_id: float = round(self.blosum_ids[e], 2)
             ref_exon_name: str = ref_exon_template.format(e, self.exon2chain[e])
             query_exon_name: str = query_exon_template.format(
-                e, self.exon2chain[e], self.exon2chrom[e],
-                *self.abs_exon_coords[e].tuple(), nuc_id, blosum_id
+                e,
+                self.exon2chain[e],
+                self.exon2chrom[e],
+                *self.abs_exon_coords[e].tuple(),
+                nuc_id,
+                blosum_id,
             )
-            ref_seq: str = self._exon_seq(e, ref=True).replace('>', '-').replace(' ', '-')
-            query_seq: str = self._exon_seq(e, ref=False).replace('>', '-').upper()
+            ref_seq: str = (
+                self._exon_seq(e, ref=True).replace(">", "-").replace(" ", "-")
+            )
+            query_seq: str = self._exon_seq(e, ref=False).replace(">", "-").upper()
             output.extend([ref_exon_name, ref_seq, query_exon_name, query_seq])
-        return '\n'.join(output) + '\n'
+        return "\n".join(output) + "\n"
 
     def codon_fasta(self) -> str:
         """
         Returns codon alignment in FASTA format,
         with codons separated by whitespaces
         """
-        chains: str = ','.join(self.chains)
-        r_name: str = f'>{self.name}| {chains} | CODON | REFERENCE'
-        q_name: str = f'>{self.name}| {chains} | CODON | QUERY'
-        return '\n'.join(
+        chains: str = ",".join(self.chains)
+        r_name: str = f">{self.name}| {chains} | CODON | REFERENCE"
+        q_name: str = f">{self.name}| {chains} | CODON | QUERY"
+        return "\n".join(
             [
                 r_name,
-                ' '.join(self.all_ref_codons.values()),
+                " ".join(self.all_ref_codons.values()),
                 q_name,
-                ' '.join(self.all_query_codons.values())
+                " ".join(self.all_query_codons.values()),
             ]
         )
 
@@ -3600,13 +4152,15 @@ class ProcessedSegment:
         """
         Returns amino acid alignment in FASTA format
         """
-        chains: str = ','.join(self.chains)
-        r_name: str = f'>{self.name} | PROT | REFERENCE'
-        q_name: str = f'>{self.name} | PROT | QUERY'
-        return '\n'.join(
+        chains: str = ",".join(self.chains)
+        r_name: str = f">{self.name} | PROT | REFERENCE"
+        q_name: str = f">{self.name} | PROT | QUERY"
+        return "\n".join(
             [
-                r_name, ''.join(self.ref_aa_seq.values()),
-                q_name, ''.join(self.query_aa_seq.values())
+                r_name,
+                "".join(self.ref_aa_seq.values()),
+                q_name,
+                "".join(self.query_aa_seq.values()),
             ]
         )
 
@@ -3615,31 +4169,40 @@ class ProcessedSegment:
         Returns exon nucleotide alignment in FASTA format
         """
         output: List[str] = []
-        ref_exon_template: str = f'>{self.name} | {{}} | {{}} | reference_exon'
+        ref_exon_template: str = f">{self.name} | {{}} | {{}} | reference_exon"
         query_exon_template: str = (
-            f'>{self.name} | {{}} | {{}} | {{}}:{{}}-{{}} | {{}} | {{}} | '
-            f'{{}}:{{}} | {{}} | {{}} | query_exon'
+            f">{self.name} | {{}} | {{}} | {{}}:{{}}-{{}} | {{}} | {{}} | "
+            f"{{}}:{{}} | {{}} | {{}} | query_exon"
         )
         orth: str = self._orth_label()
         for e in range(1, self.exon_num + 1):
             nuc_id: float = round(self.nuc_ids[e], 2)
             blosum_id: float = round(self.blosum_ids[e], 2)
             ref_exon_name: str = ref_exon_template.format(e, self.exon2chain[e])
-            found_in_exp: str = 'INC' if self.found_in_exp_locus[e] else 'EXCL'
+            found_in_exp: str = "INC" if self.found_in_exp_locus[e] else "EXCL"
             exp_start, exp_stop = self.expected_coordinates[e]
             if exp_start is not None:
-                exp_coords: str = f'{exp_start}-{exp_stop}'
+                exp_coords: str = f"{exp_start}-{exp_stop}"
             else:
-                exp_coords: str = 'NA-NA'
+                exp_coords: str = "NA-NA"
             query_exon_name: str = query_exon_template.format(
-                e, self.exon2chain[e], self.exon2chrom[e],
-                *self.abs_exon_coords[e].tuple(), nuc_id, blosum_id,
-                self.exon2chrom[e], exp_coords, found_in_exp, orth
+                e,
+                self.exon2chain[e],
+                self.exon2chrom[e],
+                *self.abs_exon_coords[e].tuple(),
+                nuc_id,
+                blosum_id,
+                self.exon2chrom[e],
+                exp_coords,
+                found_in_exp,
+                orth,
             )
-            ref_seq: str = self._exon_seq(e, ref=True).replace('>', '-').replace(' ', '-')
-            query_seq: str = self._exon_seq(e, ref=False).replace('>', '-')
+            ref_seq: str = (
+                self._exon_seq(e, ref=True).replace(">", "-").replace(" ", "-")
+            )
+            query_seq: str = self._exon_seq(e, ref=False).replace(">", "-")
             output.extend([ref_exon_name, ref_seq, query_exon_name, query_seq])
-        return '\n'.join(output)
+        return "\n".join(output)
 
     def exon_meta(self) -> Iterable[str]:
         """
@@ -3649,61 +4212,87 @@ class ProcessedSegment:
             chain: str = self.exon2chain[ex]
             chrom: str = self.exon2chrom[ex]
             if ex in self.unaligned_exons:
-                start, stop = 'NA', 'NA'
+                start, stop = "NA", "NA"
             else:
                 start, stop = self.abs_exon_coords[ex].tuple()
-            strand: str = '+' if self._exon2strand(ex) else '-'
-            was_aligned: bool = 'UNALIGNED' if ex in self.unaligned_exons else 'ALIGNED'
-            has_gap: str = 'INTERSECTS_GAP' if self.intersects_gap[ex] else 'GAP_FREE'
+            strand: str = "+" if self._exon2strand(ex) else "-"
+            was_aligned: bool = "UNALIGNED" if ex in self.unaligned_exons else "ALIGNED"
+            has_gap: str = "INTERSECTS_GAP" if self.intersects_gap[ex] else "GAP_FREE"
             exp_start, exp_stop = self.expected_coordinates[ex]
             if exp_start is None:
-                exp_coords: str = f'{chrom}:NA-NA'
+                exp_coords: str = f"{chrom}:NA-NA"
             else:
-                exp_coords: str = f'{chrom}:{exp_start}-{exp_stop}'
-            found_in_exp: str = 'INCL' if self.found_in_exp_locus[ex] else 'EXCL'
+                exp_coords: str = f"{chrom}:{exp_start}-{exp_stop}"
+            found_in_exp: str = "INCL" if self.found_in_exp_locus[ex] else "EXCL"
             # intersects_gap: str = ''
             start_from_cesar: bool = self.cesar_acc_support[ex]
             stop_from_cesar: bool = self.cesar_donor_support[ex]
             start_from_cesar = (
-                'START_ALIGNED' if start_from_cesar or ex == 1 else 'START_UNALIGNED'
+                "START_ALIGNED" if start_from_cesar or ex == 1 else "START_UNALIGNED"
             )
             stop_from_cesar = (
-                'STOP_ALIGNED' if stop_from_cesar or ex == self.exon_num else 'STOP_UNALIGNED'
+                "STOP_ALIGNED"
+                if stop_from_cesar or ex == self.exon_num
+                else "STOP_UNALIGNED"
             )
             start_from_sai: bool = self.spliceai_acc_support[ex]
             stop_from_sai: bool = self.spliceai_donor_support[ex]
             start_from_sai = (
-                'FIRST_EXON' if ex == 1 else 'ACC_SUPPORTED' if start_from_sai
-                else 'ACC_UNSUPPORTED'
+                "FIRST_EXON"
+                if ex == 1
+                else "ACC_SUPPORTED"
+                if start_from_sai
+                else "ACC_UNSUPPORTED"
             )
             stop_from_sai = (
-                'DONOR_SUPPORTED' if stop_from_sai else 'LAST_EXON'
-                if ex == self.exon_num else 'DONOR_UNSUPPORTED'
+                "DONOR_SUPPORTED"
+                if stop_from_sai
+                else "LAST_EXON"
+                if ex == self.exon_num
+                else "DONOR_UNSUPPORTED"
             )
             acc_prob: bool = self.acc_site_prob[ex]
             donor_prob: bool = self.donor_site_prob[ex]
             chain_support: str = (
-                'CHAIN_UNSUPPORTED' if ex in self.out_of_chain_exons else 'CHAIN_SUPPORTED'
+                "CHAIN_UNSUPPORTED"
+                if ex in self.out_of_chain_exons
+                else "CHAIN_SUPPORTED"
             )
             out_line: List[str] = [
-                self.name, ex, chain, chrom, start, stop,
-                strand, self.exon_presence[ex], was_aligned,
-                self.exon_quality[ex], start_from_cesar, stop_from_cesar,
-                start_from_sai, acc_prob, stop_from_sai, donor_prob,
-                exp_coords, found_in_exp, has_gap, chain_support,
-                self.nuc_ids[ex], self.blosum_ids[ex]
+                self.name,
+                ex,
+                chain,
+                chrom,
+                start,
+                stop,
+                strand,
+                self.exon_presence[ex],
+                was_aligned,
+                self.exon_quality[ex],
+                start_from_cesar,
+                stop_from_cesar,
+                start_from_sai,
+                acc_prob,
+                stop_from_sai,
+                donor_prob,
+                exp_coords,
+                found_in_exp,
+                has_gap,
+                chain_support,
+                self.nuc_ids[ex],
+                self.blosum_ids[ex],
             ]
-            yield '\t'.join(map(str, out_line))
+            yield "\t".join(map(str, out_line))
 
     def mutation_file(self) -> str:
         """Returns a TSV-formatted list of mutations found"""
-        output: str = ''
+        output: str = ""
         for exon, subexons in self.introns_gained.items():
             portion: int = self.exon2portion[exon]
             introns: List[Tuple[int, int]] = [
                 (
-                    self._abs_coord(subexons[i-1][1], portion=portion), 
-                    self._abs_coord(subexons[i][0], portion=portion)
+                    self._abs_coord(subexons[i - 1][1], portion=portion),
+                    self._abs_coord(subexons[i][0], portion=portion),
                 )
                 for i in range(1, len(subexons))
             ]
@@ -3713,11 +4302,11 @@ class ProcessedSegment:
             for intron in introns:
                 first_codon: int = self._base2codon(intron[0], exon)
                 last_codon: int = self._base2codon(intron[1], exon)
-                codon_label: str = f'{first_codon}_{last_codon}'
+                codon_label: str = f"{first_codon}_{last_codon}"
                 first_ref_codon: int = self._base2codon(intron[0], exon, True)
                 last_ref_codon: int = self._base2codon(intron[1], exon, True)
-                ref_codon_label: str = f'{first_ref_codon}_{last_ref_codon}'
-                mutation_id: str = f'GAIN_{intron_gain_counter}'
+                ref_codon_label: str = f"{first_ref_codon}_{last_ref_codon}"
+                mutation_id: str = f"GAIN_{intron_gain_counter}"
                 mut_record: Mutation = Mutation(
                     self.transcript,
                     self.exon2chain[exon],
@@ -3727,21 +4316,22 @@ class ProcessedSegment:
                     chrom,
                     *sorted(intron),
                     INTRON_GAIN,
-                    '-',
-                    True, ## intron gains are not considered as inactivating mutations
+                    "-",
+                    True,  ## intron gains are not considered as inactivating mutations
                     INTRON_GAIN_MASK_REASON,
-                    mutation_id
+                    mutation_id,
                 )
                 self.mutation_list.append(mut_record)
                 intron_gain_counter += 1
         mutations: List[Mutation] = sorted(
-            self.mutation_list, key=lambda x: (
-                x.exon if isinstance(x.exon, int) else int(x.exon.split('_')[0]),
-                x.codon if isinstance(x.codon, int) else int(x.codon.split('_')[0])
-            )
+            self.mutation_list,
+            key=lambda x: (
+                x.exon if isinstance(x.exon, int) else int(x.exon.split("_")[0]),
+                x.codon if isinstance(x.codon, int) else int(x.codon.split("_")[0]),
+            ),
         )
         for mut in mutations:
-            output += str(mut) + '\n'
+            output += str(mut) + "\n"
         return output
 
     def transcript_meta(self) -> str:
@@ -3749,7 +4339,7 @@ class ProcessedSegment:
         Returns the intact/present portion stats as defined in the older
         CESAR wrapper output formatted in a TSV manner
         """
-        return '\t'.join(
+        return "\t".join(
             [
                 self.name,
                 self.loss_status,
@@ -3758,39 +4348,41 @@ class ProcessedSegment:
                 str(self.longest_fraction_strict),
                 str(self.longest_fraction_relaxed),
                 str(self.total_intact_fraction),
-                'MIDDLE_IS_INTACT' if self.middle_is_intact else 'MIDDLE_IS_AFFECTED',
-                'MIDDLE_IS_PRESENT' if self.middle_is_present else 'MIDDLE_IS_MISSING'
+                "MIDDLE_IS_INTACT" if self.middle_is_intact else "MIDDLE_IS_AFFECTED",
+                "MIDDLE_IS_PRESENT" if self.middle_is_present else "MIDDLE_IS_MISSING",
             ]
         )
 
     def cds_nuc(self) -> str:
         """Returns stripped query nucleotide sequence in FASTA format"""
-        header: str = f'>{self.name}'
+        header: str = f">{self.name}"
         seq: str = self._cds_seq()
-        return f'{header}\n{seq}'
+        return f"{header}\n{seq}"
 
     def splice_site_table(self) -> str:
         """
         Returns the tab-separated four column table containing splice site
         dinucleotides in the "projection-exon-acceptor-donor" format
         """
-        out_str: str = ''
+        out_str: str = ""
         for exon in self.splice_site_nucs:
-            acc: str = self.splice_site_nucs[exon]['A']
+            acc: str = self.splice_site_nucs[exon]["A"]
             # acc_class: str = self.u12[exon]['acceptor'][0]
-            donor: str = self.splice_site_nucs[exon]['D']
+            donor: str = self.splice_site_nucs[exon]["D"]
             # donor_class: str = self.u12[exon]['donor'][0]
-            out_str += f'{self.name}\t{exon}\t{acc}\t{donor}'
+            out_str += f"{self.name}\t{exon}\t{acc}\t{donor}"
             if exon < self.exon_num:
-                out_str += '\n'
+                out_str += "\n"
         return out_str
 
     def selenocysteine_codon_table(self) -> str:
-        out_str: str = ''
+        out_str: str = ""
         if not self.selenocysteine_codons:
             return out_str
         sc_num: int = len(self.selenocysteine_codons)
-        for i, (exon, codon_num, codon) in enumerate(self.selenocysteine_codons, start=1):
+        for i, (exon, codon_num, codon) in enumerate(
+            self.selenocysteine_codons, start=1
+        ):
             if exon is None:
                 exon = next(self._codon2exon(codon_num))
             strand: bool = self._exon2strand(exon)
@@ -3798,14 +4390,13 @@ class ProcessedSegment:
             coords: List[int] = self.triplet_coordinates[codon_num]
             start: int = min(coords) - (0 if strand else 1)
             end: int = max(coords) + (1 if strand else 0)
-            out_line: str = '\t'.join(
+            out_line: str = "\t".join(
                 map(str, (self.name, exon, codon_num, chrom, start, end, codon))
             )
             out_str += out_line
             if i < sc_num:
-                out_str += '\n'
+                out_str += "\n"
         return out_str
-
 
     def splice_site_shifts(self) -> str:
         """
@@ -3813,45 +4404,74 @@ class ProcessedSegment:
         """
         out_str: List[str] = []
         if self.correction_mode <= 1:
-            return ''
+            return ""
         for ex in range(1, self.exon_num + 1):
             final_start, final_end = self.abs_exon_coords[ex].tuple()
-            coord_str: str = f'{self.exon2chrom[ex]}:{final_start}-{final_end}'
+            coord_str: str = f"{self.exon2chrom[ex]}:{final_start}-{final_end}"
             strand: bool = self._exon2strand(ex)
-            strand_str: str = '+' if strand else '-'
+            strand_str: str = "+" if strand else "-"
             p: int = self.exon2portion[ex]
             abs_cesar_start, abs_cesar_end = sorted(
-                map(lambda x: self._abs_coord(x, exon=ex, portion=p), self.cesar_rel_coords[ex].tuple())
+                map(
+                    lambda x: self._abs_coord(x, exon=ex, portion=p),
+                    self.cesar_rel_coords[ex].tuple(),
+                )
             )
             acc_from_sai: bool = self.spliceai_acc_support[ex]
             donor_from_sai: bool = self.spliceai_donor_support[ex]
             start_shifted: bool = final_start != abs_cesar_start
             end_shifted: bool = final_end != abs_cesar_end
-            acc_shifted: bool = acc_from_sai and (start_shifted if strand else end_shifted)
-            donor_shifted: bool = donor_from_sai and (end_shifted if strand else start_shifted)
+            acc_shifted: bool = acc_from_sai and (
+                start_shifted if strand else end_shifted
+            )
+            donor_shifted: bool = donor_from_sai and (
+                end_shifted if strand else start_shifted
+            )
             if acc_shifted:
-                side: str = 'acceptor'
+                side: str = "acceptor"
                 intron_class: str = self.u12[ex][side][0]
-                diff: int = (final_start - abs_cesar_start) if strand else (final_end - abs_cesar_end)
-                diff_str: str = ('+' if diff > 0 else '') + str(diff)
+                diff: int = (
+                    (final_start - abs_cesar_start)
+                    if strand
+                    else (final_end - abs_cesar_end)
+                )
+                diff_str: str = ("+" if diff > 0 else "") + str(diff)
                 prob: bool = self.acc_site_prob[ex]
-                dinuc: str = self.splice_site_nucs[ex]['A']
+                dinuc: str = self.splice_site_nucs[ex]["A"]
                 out_line: Tuple[str] = (
-                    self.name, str(ex), coord_str, strand_str, 
-                    side, diff_str, intron_class, str(prob), dinuc
+                    self.name,
+                    str(ex),
+                    coord_str,
+                    strand_str,
+                    side,
+                    diff_str,
+                    intron_class,
+                    str(prob),
+                    dinuc,
                 )
-                out_str.append('\t'.join(out_line))
+                out_str.append("\t".join(out_line))
             if donor_shifted:
-                side: str = 'donor'
+                side: str = "donor"
                 intron_class: str = self.u12[ex][side][0]
-                diff: int = (final_end - abs_cesar_end) if strand else (final_start  - abs_cesar_start)
-                diff_str: str = ('+' if diff > 0 else '') + str(diff)
-                prob: bool = self.donor_site_prob[ex]
-                dinuc: str = self.splice_site_nucs[ex]['D']
-                out_line: Tuple[str] = (
-                    self.name, str(ex), coord_str, strand_str, 
-                    side, diff_str, str(intron_class), str(prob), dinuc
+                diff: int = (
+                    (final_end - abs_cesar_end)
+                    if strand
+                    else (final_start - abs_cesar_start)
                 )
-                out_str.append('\t'.join(out_line))
-        out_str: str = '\n'.join(out_str)
+                diff_str: str = ("+" if diff > 0 else "") + str(diff)
+                prob: bool = self.donor_site_prob[ex]
+                dinuc: str = self.splice_site_nucs[ex]["D"]
+                out_line: Tuple[str] = (
+                    self.name,
+                    str(ex),
+                    coord_str,
+                    strand_str,
+                    side,
+                    diff_str,
+                    str(intron_class),
+                    str(prob),
+                    dinuc,
+                )
+                out_str.append("\t".join(out_line))
+        out_str: str = "\n".join(out_str)
         return out_str

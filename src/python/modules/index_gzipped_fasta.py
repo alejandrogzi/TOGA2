@@ -4,51 +4,48 @@
 Creates a binary index for gzip-compressed exon Fasta file
 """
 
+import gzip
+import os
+import struct
 from typing import List, TextIO
-from shared import CONTEXT_SETTINGS
 
 import click
-import gzip
-import struct
-import os
+from shared import CONTEXT_SETTINGS
+
 # import zlib
 
-HEADER_START: bytes = b'>'
-NEWLINE: bytes = b'\n'
-QUERY_EXON: str = b'query_exon'
+HEADER_START: bytes = b">"
+NEWLINE: bytes = b"\n"
+QUERY_EXON: str = b"query_exon"
 
 WRITE_COUNTER: int = 0
+
 
 def write_index_line(
     proj: bytes, exon_num: int, start_byte: int, end_byte: int, file: TextIO
 ) -> None:
     global WRITE_COUNTER
     proj_byte_len: int = len(proj)
-    file.write(struct.pack('>I', proj_byte_len))
+    file.write(struct.pack(">I", proj_byte_len))
     file.write(proj)
-    file.write(struct.pack('>Q', exon_num))
-    file.write(struct.pack('>Q', start_byte))
-    file.write(struct.pack('>Q', end_byte))
+    file.write(struct.pack(">Q", exon_num))
+    file.write(struct.pack(">Q", start_byte))
+    file.write(struct.pack(">Q", end_byte))
     WRITE_COUNTER += 1
 
 
 @click.command(context_settings=CONTEXT_SETTINGS, no_args_is_help=True)
-@click.argument(
-    'input_',
-    type=click.Path(exists=True),
-    metavar='INPUT'
-)
-
+@click.argument("input_", type=click.Path(exists=True), metavar="INPUT")
 def main(input_: click.Path) -> None:
     global WRITE_COUNTER
     in_dir: str = os.path.dirname(input_)
-    out_file: str = '.' + os.path.basename(input_) + '.ix'
+    out_file: str = "." + os.path.basename(input_) + ".ix"
     output_: str = os.path.join(in_dir, out_file)
-    with gzip.open(input_, 'rb') as ih, open(output_, 'wb') as oh:
+    with gzip.open(input_, "rb") as ih, open(output_, "wb") as oh:
         # decompressor = zlib.decompressobj(32 + zlib.MAX_WBITS)
-        buffer: bytes = b''
-        proj: bytes = b''
-        exon_num: int = ''
+        buffer: bytes = b""
+        proj: bytes = b""
+        exon_num: int = ""
         start_byte: int = 0
         current_position: int = 0
         processed_len: int = 0
@@ -58,25 +55,29 @@ def main(input_: click.Path) -> None:
             chunk: bytes = ih.read(1024)
             if not chunk:
                 break
-            buffer += chunk#decompressed_data
+            buffer += chunk  # decompressed_data
             while True:
                 newline_index: int = buffer.find(NEWLINE)
                 if newline_index < 0:
                     break
                 # print(f'{buffer=}')
-                line: bytes = buffer[:newline_index + 1]
-                buffer = buffer[newline_index + 1:]
+                line: bytes = buffer[: newline_index + 1]
+                buffer = buffer[newline_index + 1 :]
                 # print(f'{line=}')
                 # print(f'{buffer=}')
                 # current_position = ih.tell() - len(buffer) + len(line) + processed_len
-                current_position: int = ih.tell() - len(buffer) - newline_index - 1 # + processed_len
+                current_position: int = (
+                    ih.tell() - len(buffer) - newline_index - 1
+                )  # + processed_len
                 # print(f'{start_byte=}, {current_position=}, {ih.tell()=}, {len(buffer)=}, {processed_len=}')
-                if line.startswith(b'>'):
+                if line.startswith(b">"):
                     if proj:
-                        write_index_line(proj, exon_num, start_byte, current_position, oh)
-                        proj = b''
+                        write_index_line(
+                            proj, exon_num, start_byte, current_position, oh
+                        )
+                        proj = b""
                         exon_num = 0
-                    header_split: List[bytes] = line.rstrip().split(b' | ')
+                    header_split: List[bytes] = line.rstrip().split(b" | ")
                     # print(f'{header_split=}')
                     source: bytes = header_split[-1]
                     if source == QUERY_EXON:
@@ -136,5 +137,5 @@ def main(input_: click.Path) -> None:
         #                 start_byte = line_start_pos
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

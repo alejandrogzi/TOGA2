@@ -4,75 +4,75 @@
 Wrapper over TogaMain for file-configured runs
 """
 
-from .constants import TOGA2_ARG2SLOT, TOGA2_SLOT2ARG
-from .shared import CommandLineManager
-from .toga_main import __version__
+import os
 from typing import Dict, List, Optional, Tuple, Union
 
 import click
-import os
 
-__author__ = 'Yury V. Malovichko'
-__year__ = '2024'
-__all__ = (None)
+from .constants import TOGA2_ARG2SLOT, TOGA2_SLOT2ARG
+from .shared import CommandLineManager
+from .toga_main import __version__
+
+__author__ = "Yury V. Malovichko"
+__year__ = "2024"
+__all__ = None
 
 LOCATION: str = os.path.dirname(os.path.abspath(__file__))
-TOGA2: str = os.path.join(LOCATION, 'toga2.py')
+TOGA2: str = os.path.join(LOCATION, "toga2.py")
 COL_NUM: int = 2
-REF: str = 'ref_2bit'
-QUERY: str = 'query_2bit'
-CHAIN: str = 'chain_file'
-ANNOT: str = 'ref_annotation'
-MANDATORY_ARGS: Tuple[str] = (REF, QUERY, CHAIN, ANNOT)
-TRUE: str = 'True'
-FALSE: str = 'False'
-NONE: str = 'None'
-PROJ_ARG_FILE: str = 'project_args.json'
-VERSION: str = 'version'
+REF: str = "ref_2bit"
+QUERY: str = "query_2bit"
+CHAIN: str = "chain_file"
+ANNOT: str = "ref_annotation"
+MANDATORY_ARGS: Tuple[str, ...] = (REF, QUERY, CHAIN, ANNOT)
+TRUE: str = "True"
+FALSE: str = "False"
+NONE: str = "None"
+PROJ_ARG_FILE: str = "project_args.json"
+VERSION: str = "version"
+
 
 class Toga2ConfiguredLauncher(CommandLineManager):
-    __slots__ = ('v', 'config_file', 'override')
+    __slots__ = ("v", "config_file", "override")
 
     def __init__(
-        self, 
-        config_file: click.File, 
-        override: Optional[Union[str, None]]
+        self, config_file: click.File, override: Optional[Union[str, None]]
     ) -> None:
         self.v: bool = True
         self.set_logging()
         self.logger.propagate = False
         self.config_file: click.File = config_file
         self.override: Union[str, None] = override
-    
+
     def run(self) -> Dict[str, str]:
         cmd_args: Dict[str, str] = {}
         for i, line in enumerate(self.config_file, start=1):
-            data: List[str] = line.strip().split('\t')
+            data: List[str] = line.strip().split("\t")
             if not len(data):
                 continue
             if len(data) != 2:
                 self._die(
-                    'Improper formtting at configuration file line %i; expected 2 columns, got %i' % (
-                        i, len(data)
-                    )
+                    "Improper formtting at configuration file line %i; expected 2 columns, got %i"
+                    % (i, len(data))
                 )
             arg, value = data
             if arg == VERSION:
-                self._echo('Specified TOGA2 version is %s' % value)
+                self._echo("Specified TOGA2 version is %s" % value)
                 if value != __version__:
                     self._to_log(
                         (
-                            'Current TOGA2 version is %s but the configuration file was written by/for '
-                            'version %s. Certain features listed in the provided file might differ or be '
-                            'inaccessible in the current version'
-                        ) % (__version__, value),
-                        'warning'
+                            "Current TOGA2 version is %s but the configuration file was written by/for "
+                            "version %s. Certain features listed in the provided file might differ or be "
+                            "inaccessible in the current version"
+                        )
+                        % (__version__, value),
+                        "warning",
                     )
                 continue
             if arg not in TOGA2_SLOT2ARG.values():
                 self._to_log(
-                    'WARNING: Argument/option %s is not recognized; skipping' % arg,
-                    'warning'
+                    "WARNING: Argument/option %s is not recognized; skipping" % arg,
+                    "warning",
                 )
                 continue
             # if arg in MANDATORY_ARGS:
@@ -86,22 +86,23 @@ class Toga2ConfiguredLauncher(CommandLineManager):
                 value = None
             elif value.isdigit():
                 value = int(value)
-            elif value.replace('.', '').isdigit():
+            elif value.replace(".", "").isdigit():
                 value = float(value)
             # if value == TRUE:
             #     cmd_args[arg] = True
             cmd_args[arg] = value
         if self.override is not None:
-            override = self.override.lstrip('"\'').rstrip('"\'')
-            overriden_args: List[str] = override.split(' ')
+            override = self.override.lstrip("\"'").rstrip("\"'")
+            overriden_args: List[str] = override.split(" ")
             over_arg_num: int = len(overriden_args)
             curr: int = 0
             while curr < len(overriden_args):
                 curr_arg: str = overriden_args[curr]
-                curr_arg_name: str = curr_arg.lstrip('-')
+                curr_arg_name: str = curr_arg.lstrip("-")
                 if curr_arg_name not in TOGA2_ARG2SLOT:
                     self._echo(
-                        'Option %s is not supported by TOGA2 %s' % (curr_arg_name, __version__)
+                        "Option %s is not supported by TOGA2 %s"
+                        % (curr_arg_name, __version__)
                     )
                     recognized_arg: bool = False
                 else:
@@ -114,7 +115,7 @@ class Toga2ConfiguredLauncher(CommandLineManager):
                         cmd_args[slot_name] = True
                     break
                 next_arg: str = overriden_args[curr + 1]
-                if next_arg.startswith('-'):
+                if next_arg.startswith("-"):
                     ## next item in the string is also an option, therefore this one must be a flag
                     if recognized_arg:
                         cmd_args[slot_name] = True
@@ -124,7 +125,7 @@ class Toga2ConfiguredLauncher(CommandLineManager):
                 if recognized_arg:
                     if next_arg.isdigit():
                         next_arg = int(next_arg)
-                    elif next_arg.replace('.', '').isdigit():
+                    elif next_arg.replace(".", "").isdigit():
                         next_arg = float(next_arg)
                     cmd_args[slot_name] = next_arg
                 curr += 2

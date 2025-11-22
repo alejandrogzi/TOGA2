@@ -8,20 +8,19 @@ neither nextflow nor para satisfy your needs.
 WIP, to be enabled later.
 """
 
-from abc import ABC, abstractmethod
-from typing import Union
-
 import os
 import signal
 import subprocess
 import sys
+from abc import ABC, abstractmethod
+from typing import Union
 
 # LOCATION: str = os.path.dirname(os.path.abspath(__file__))
 # PARENT: str = os.sep.join(LOCATION.split(os.sep)[:-1])
 
 # sys.path.extend([LOCATION, PARENT])
 
-__author__ = ('Yury V. Malovichko', 'Bogdan M. Kirilenko')
+__author__ = ("Yury V. Malovichko", "Bogdan M. Kirilenko")
 
 NEXTFLOW_CONFIG_STUB: str = """
 process.executor = '{}'
@@ -42,6 +41,7 @@ class ParallelizationStrategy(ABC):
     """
     Abstract base class for a parallelization strategy.
     """
+
     def __init__(self):
         self._process = None
 
@@ -76,6 +76,7 @@ class NextflowStrategy(ParallelizationStrategy):
     """
     Concrete strategy for parallelization using Nextflow.
     """
+
     CHAIN_JOBS_PREFIX = "chain_feats__"
     CESAR_JOBS_PREFIX = "cesar_jobs__"
     CESAR_CONFIG_MEM_TEMPLATE = "${_MEMORY_}"
@@ -104,22 +105,24 @@ class NextflowStrategy(ParallelizationStrategy):
         self.joblist_path = joblist_path
         self.manager_data = manager_data
         self.label = label
-        self.executor: str = kwargs.get('executor', 'local')
+        self.executor: str = kwargs.get("executor", "local")
         self.memory_limit: int = int(kwargs.get("memory_limit", DEFAULT_MEM_LIMIT))
-        self.time_limit: int = int(kwargs.get('time_limit', DEFAULT_TIME_LIMIT))
-        self.cpus: int = int(kwargs.get('cpu', DEFAULT_CPU_LIMIT))
-        self.process_limit: int = int(kwargs.get('process_num', DEFAULT_PROCESS_LIMIT))
+        self.time_limit: int = int(kwargs.get("time_limit", DEFAULT_TIME_LIMIT))
+        self.cpus: int = int(kwargs.get("cpu", DEFAULT_CPU_LIMIT))
+        self.process_limit: int = int(kwargs.get("process_num", DEFAULT_PROCESS_LIMIT))
 
-        self.nf_project_path = manager_data.get("nextflow_dir", None)  # in fact, contains NF logs
+        self.nf_project_path = manager_data.get(
+            "nextflow_dir", None
+        )  # in fact, contains NF logs
         self.keep_logs = manager_data.get("keep_nf_logs", False)
         self.use_local_executor = manager_data.get("local_executor", False)
-        self.nf_master_script = manager_data['NF_EXECUTE']  # NF execution script
+        self.nf_master_script = manager_data["NF_EXECUTE"]  # NF execution script
         self.nextflow_config_dir = manager_data.get("nextflow_config_dir", None)
         self.queue_name = manager_data.get("queue_name", self.DEFAULT_QUEUE_NAME)
-        self.logger = manager_data['logger']
+        self.logger = manager_data["logger"]
 
         self.config_path: Union[str, None] = (
-            manager_data.get('nextflow_config_file') or self._create_config_file()
+            manager_data.get("nextflow_config_file") or self._create_config_file()
         )
 
         # create the nextflow process
@@ -137,14 +140,14 @@ class NextflowStrategy(ParallelizationStrategy):
                 shell=True,
                 stdout=log_file,
                 stderr=log_file,
-                cwd=self.nf_project_path
+                cwd=self.nf_project_path,
             )
         if wait:
             try:
                 self._process.wait()
             except KeyboardInterrupt:
                 self.terminate_process()
-                self.logger.warning('Exiting due to parallel step keyboard interrupt')
+                self.logger.warning("Exiting due to parallel step keyboard interrupt")
                 sys.exit(0)
 
     def terminate_process(self):
@@ -154,9 +157,13 @@ class NextflowStrategy(ParallelizationStrategy):
         pid: int = self._process.pid
         try:
             os.kill(pid, signal.SIGTERM)
-            self.logger.warning('Nextflow process %s successfully interrupted' % self.label)
+            self.logger.warning(
+                "Nextflow process %s successfully interrupted" % self.label
+            )
         except ProcessLookupError:
-            self.logger.warning('Nextflow process %s does not exist and was likely aborted' % self.label)
+            self.logger.warning(
+                "Nextflow process %s does not exist and was likely aborted" % self.label
+            )
         ## TODO: Test whether Slurm/LSF jobs are actually killed after that
 
     def _create_config_file(self) -> Union[str, None]:
@@ -164,16 +171,21 @@ class NextflowStrategy(ParallelizationStrategy):
         if self.use_local_executor:
             return
         ## define a path to the configuration file
-        config_path: str = os.path.join(self.nextflow_config_dir, self.label + '.config')
+        config_path: str = os.path.join(
+            self.nextflow_config_dir, self.label + ".config"
+        )
         ## populate the stub
         config_body: str = NEXTFLOW_CONFIG_STUB.format(
-            self.executor, self.queue_name, 
-            self.time_limit, self.memory_limit,
-            self.cpus, self.process_limit
+            self.executor,
+            self.queue_name,
+            self.time_limit,
+            self.memory_limit,
+            self.cpus,
+            self.process_limit,
         )
         ## write the populated boilerplate to a file
-        with open(config_path, 'w') as h:
-            h.write(config_body + '\n')
+        with open(config_path, "w") as h:
+            h.write(config_body + "\n")
         return config_path
 
     # def __create_config_file(self):
@@ -255,27 +267,29 @@ class ParaStrategy(ParallelizationStrategy):
             memory_mb = int(kwargs["memory_limit"] * 1000)  # para uses MB instead of GB
             cmd += f" --memoryMb={memory_mb} "
         # otherwise use default para's 10Gb
-        if 'cpu' in kwargs:
-            cpus: int = kwargs['cpu']
-            cmd += f' -numCores {cpus} '
+        if "cpu" in kwargs:
+            cpus: int = kwargs["cpu"]
+            cmd += f" -numCores {cpus} "
         ## otherwise use single core per job
-        if 'clean' in kwargs:
-            self.clean: bool = kwargs['clean']
+        if "clean" in kwargs:
+            self.clean: bool = kwargs["clean"]
         else:
             self.clean: bool = False
-        self.logger = manager_data['logger']
+        self.logger = manager_data["logger"]
 
         log_dir = manager_data["logs_dir"]
         os.mkdir(log_dir) if not os.path.isdir(log_dir) else None
         log_file_path = os.path.join(manager_data["logs_dir"], f"{label}.log")
         with open(log_file_path, "w") as log_file:
-            self._process = subprocess.Popen(cmd, shell=True, stdout=log_file, stderr=log_file)
+            self._process = subprocess.Popen(
+                cmd, shell=True, stdout=log_file, stderr=log_file
+            )
         if wait:
             try:
                 self._process.wait()
             except KeyboardInterrupt:
                 self.terminate_process()
-                self.logger.warning('Exiting due to parallel step keyboard interrupt')
+                self.logger.warning("Exiting due to parallel step keyboard interrupt")
                 sys.exit(0)
 
     def check_status(self):
@@ -296,15 +310,16 @@ class ParaStrategy(ParallelizationStrategy):
         pid: int = self._process.pid
         try:
             os.kill(pid, signal.SIGTERM)
-            self.logger.warning('Para process %s successfully interrupted' % self.label)
+            self.logger.warning("Para process %s successfully interrupted" % self.label)
         except ProcessLookupError:
-            self.logger.warning('Para process %s does not exist and was likely aborted' % self.label)
-        self.logger.warning('Stopping the Para batch')
-        subprocess.call(['para', 'stop', self.label])
+            self.logger.warning(
+                "Para process %s does not exist and was likely aborted" % self.label
+            )
+        self.logger.warning("Stopping the Para batch")
+        subprocess.call(["para", "stop", self.label])
         if self.clean:
-            self.logger.warning('Cleaning Para temporary data')
-            subprocess.call(['para', 'clean', self.label])
-
+            self.logger.warning("Cleaning Para temporary data")
+            subprocess.call(["para", "clean", self.label])
 
 
 class SnakeMakeStrategy(ParallelizationStrategy):
@@ -312,6 +327,7 @@ class SnakeMakeStrategy(ParallelizationStrategy):
     Not implemented class for Snakemake strategy.
     Might be helpful for users experiencing issues with Nextflow.
     """
+
     def __int__(self):
         self._process = None
         self.return_code = None
@@ -333,7 +349,9 @@ class CustomStrategy(ParallelizationStrategy):
         super().__init__()
         self._process = None
         self.return_code = None
-        raise NotImplementedError("Custom strategy is not implemented -> pls see documentation")
+        raise NotImplementedError(
+            "Custom strategy is not implemented -> pls see documentation"
+        )
 
     def execute(self, joblist_path, manager_data, label, wait=False, **kwargs):
         """Custom implementation.
@@ -352,7 +370,9 @@ class CustomStrategy(ParallelizationStrategy):
 
         If your strategy works well, we can include it in the main repo.
         """
-        raise NotImplementedError("Custom strategy is not implemented -> pls see documentation")
+        raise NotImplementedError(
+            "Custom strategy is not implemented -> pls see documentation"
+        )
 
     def check_status(self):
         """Check if Para jobs are done.
@@ -362,7 +382,9 @@ class CustomStrategy(ParallelizationStrategy):
 
         To work properly, the method should return None if the process is still going.
         Otherwise, return status code (int)."""
-        raise NotImplementedError("Custom strategy is not implemented -> pls see documentation")
+        raise NotImplementedError(
+            "Custom strategy is not implemented -> pls see documentation"
+        )
 
 
 class ParallelJobsManager:

@@ -4,45 +4,37 @@
 Shared functionality across the scripts
 """
 
-from click_option_group import OptionGroup
-from datetime import datetime
-from logging import Formatter
-from shutil import copy2, rmtree
-from typing import (
-    Any, Dict, Iterable, List, Optional, TextIO, Set, Tuple, Union
-)
-
-import click
 import ctypes
 import fcntl
 import logging
-import networkx as nx
 import os
 import subprocess
 import sys
 import time
+from datetime import datetime
+from logging import Formatter
+from shutil import copy2, rmtree
+from typing import Any, Dict, Iterable, List, Optional, Set, TextIO, Tuple, Union
+
+import click
+import networkx as nx
+from click_option_group import OptionGroup
 
 ## Constants
 CONTEXT_SETTINGS: Dict[str, Any] = {
-    'help_option_names': [
-        '-h', '-help', '--help'
-    ],
-    'ignore_unknown_options': True,
-    'allow_extra_args': True,
-    'max_content_width': 150
+    "help_option_names": ["-h", "-help", "--help"],
+    "ignore_unknown_options": True,
+    "allow_extra_args": True,
+    "max_content_width": 150,
 }
 ## borrowed from splitFile
-SPLIT_JOB_HEADER: Tuple[str] = (
-    "#!/bin/bash",
-    "set -eu",
-    "set -o pipefail"
-)
+SPLIT_JOB_HEADER: Tuple[str, str, str] = ("#!/bin/bash", "set -eu", "set -o pipefail")
 SLIB_NAME = "chain_bst_lib.so"
-UTF8: str = 'utf-8'
+UTF8: str = "utf-8"
 FORMATTER: Formatter = Formatter(
-    '[{asctime}][{filename}] - {levelname}: {message}',
-    style='{',
-    datefmt='%Y-%m-%d %H:%M:%S',
+    "[{asctime}][{filename}] - {levelname}: {message}",
+    style="{",
+    datefmt="%Y-%m-%d %H:%M:%S",
 )
 
 ## Sequence handling & score calculation data
@@ -57,18 +49,19 @@ COMPLEMENT: Dict[str, str] = {
     "g": "c",
     "c": "g",
     "n": "n",
-    "-": "-"
+    "-": "-",
 }
 
 ## Types
 Numeric = Union[float, int]
+
 
 class PrettyGroup(OptionGroup):
     def get_help_record(self, ctx: click.Context) -> Optional[Tuple[str, str]]:
         init_help: Union[Tuple[str, str], None] = super().get_help_record(ctx)
         if init_help is None:
             return None
-        return '\n' + init_help[0], init_help[1]
+        return "\n" + init_help[0], init_help[1]
 
 
 ## Executables
@@ -79,7 +72,7 @@ def dir_name_by_date(prefix: str) -> str:
 
 def hex_code() -> str:
     """
-    Generates a random five-digit decimal number 
+    Generates a random five-digit decimal number
     and converts it into hexadecimal
     """
     return os.urandom(5).hex()
@@ -87,7 +80,7 @@ def hex_code() -> str:
 
 def hex_dir_name(prefix: str) -> str:
     """A combination of the two functions above"""
-    return f'{dir_name_by_date(prefix)}_{hex_code()}'
+    return f"{dir_name_by_date(prefix)}_{hex_code()}"
 
 
 def die(message: str) -> int:
@@ -97,7 +90,7 @@ def die(message: str) -> int:
 
 def get_upper_dir(file: str, lvl: int):
     """
-    Get absolute path to a paternal directory of 'lvl' levels above the file. 
+    Get absolute path to a paternal directory of 'lvl' levels above the file.
     Setting lvl to zero will return the current directory for the file.
     """
     curr: str = os.path.abspath(file)
@@ -110,30 +103,30 @@ def aggregate(input_dir: str, output_file: str) -> None:
     """
     Aggregate the contents of all files in the specificed directory into one file
     """
-    subprocess.run(f'cat {input_dir}/* > {output_file}', shell=True)
+    subprocess.run(f"cat {input_dir}/* > {output_file}", shell=True)
 
 
-def parts(lst: Iterable[Any], n: int =3):
+def parts(lst: Iterable[Any], n: int = 3):
     """Split an iterable into parts with size n."""
     return [lst[i : i + n] for i in iter(range(0, len(lst), n))]
 
 
 def base_proj_name(projection: str) -> str:
     """Removes the metadata suffixes from the projection name"""
-    return projection.split('$')[0].replace('#paralog', '').replace('#retro', '')
+    return projection.split("$")[0].replace("#paralog", "").replace("#retro", "")
 
 
 def segment_base(projection: str) -> str:
     """Returns the fragmented projection's name, ignoring the fragment number"""
-    return projection.split('$')[0]
+    return projection.split("$")[0]
 
 
 def get_proj2trans(projection: str) -> Tuple[str, str]:
     """Safely extract transcript name from the chain projection name"""
-    data: List[str] = projection.split('$')[0].split('#')
-    if data[-1] == 'retro' or data[-1] == 'paralog':
+    data: List[str] = projection.split("$")[0].split("#")
+    if data[-1] == "retro" or data[-1] == "paralog":
         data = data[:-1]
-    return '#'.join(data[:-1]), data[-1]
+    return "#".join(data[:-1]), data[-1]
 
 
 def safe_div(dividend: Union[float, int], divisor: Union[float, int]) -> float:
@@ -161,23 +154,18 @@ def safe_make_dir(dir: str) -> None:
     """
     if os.path.isfile(dir) and not os.path.isdir(dir):
         die(
-            f'{dir} was passed as a directory name '
-            'but this name is already occupied by a regular file'
+            f"{dir} was passed as a directory name "
+            "but this name is already occupied by a regular file"
         )
     os.makedirs(dir) if not os.path.isdir(dir) else None
 
 
-def intersection(
-    start1: int,
-    end1: int,
-    start2: int,
-    end2: int
-) -> int:
+def intersection(start1: int, end1: int, start2: int, end2: int) -> int:
     """
-    Returns intersection length between two segments with coordinates 
+    Returns intersection length between two segments with coordinates
     (start1, end1) and (start2, end2); values smaller than one indicate no intersection
     """
-    return (min(end1, end2) - max(start1, start2))
+    return min(end1, end2) - max(start1, start2)
 
 
 def chain_extract_id(index_file, chain_id, chain_file=None):
@@ -302,9 +290,9 @@ def make_cds_track(line):
     new_line = "\t".join([str(x) for x in new_track])
     return new_line
 
+
 def get_connected_components(graph: nx.Graph) -> List[nx.Graph]:
-    """
-    """
+    """ """
     ## check the NetworkX version
     nx_v: str = nx.__version__
     v_split: List[str] = [x for x in nx_v.split(".") if x.isnumeric()]
@@ -315,9 +303,7 @@ def get_connected_components(graph: nx.Graph) -> List[nx.Graph]:
     if NX_VERSION < 2.4:
         raw_components = list(nx.connected_component_subgraphs(graph))
     else:
-        raw_components = [
-            graph.subgraph(c) for c in nx.connected_components(graph)
-        ]
+        raw_components = [graph.subgraph(c) for c in nx.connected_components(graph)]
     return raw_components
 
 
@@ -343,14 +329,14 @@ def parse_fasta(file: str) -> Dict[str, str]:
     Input is a dictionary with sequence names as keys and aligned sequences as values.
     """
     output: Dict[str, str] = dict()
-    key, seq, is_entry = '', '', False
-    for line in file.split('\n'):
+    key, seq, is_entry = "", "", False
+    for line in file.split("\n"):
         if not line:
             continue
-        if line[0] == '>':
+        if line[0] == ">":
             if is_entry:
                 output[key] = seq
-                seq = ''
+                seq = ""
             else:
                 is_entry = True
             key = line.strip().split()[0][1:]
@@ -365,7 +351,7 @@ def parse_score_file(filter_file: TextIO, score_column: int) -> Dict[str, Numeri
     out_dict: Dict[str, Numeric] = {}
     for line in filter_file.readlines():
         line: str = line.strip()
-        line_data: List[str] = line.split('\t')
+        line_data: List[str] = line.split("\t")
         if len(line_data) < 2:
             continue
         exon_name: str = line_data[0]
@@ -383,15 +369,15 @@ def parse_one_column(file: Union[str, TextIO]) -> List[str]:
     Parse single-column file into a string list. Simple as.
     """
     if isinstance(file, str):
-        return list(map(lambda x: x.strip('\n\r\t'), file.readlines()))
+        return list(map(lambda x: x.strip("\n\r\t"), file.readlines()))
     else:
-        with open(file, 'r') as h:
-            return list(map(lambda x: x.strip('\n\r\t'), h.readlines()))
+        with open(file, "r") as h:
+            return list(map(lambda x: x.strip("\n\r\t"), h.readlines()))
 
 
 def reverse_complement(seq: str) -> str:
     """Returns a reverse complement of a standard alphabet nucleotide sequence"""
-    out_seq: str = ''.join([COMPLEMENT[x] for x in seq[::-1]])
+    out_seq: str = "".join([COMPLEMENT[x] for x in seq[::-1]])
     return out_seq
 
 
@@ -399,12 +385,12 @@ def is_locked(file: str) -> bool:
     if not os.path.isfile(file):
         return False
     try:
-        with open(file, 'a'):
+        with open(file, "a"):
             pass
     except IOError:
         return True
 
-    dummy: str = file + '.dummy'
+    dummy: str = file + ".dummy"
     try:
         copy2(file, dummy)
         os.remove(dummy)
@@ -417,6 +403,7 @@ class Lock:
     """
     A homebrew lock manager to coordinate multiple scripts sharing resources
     """
+
     def __init__(
         self, lockfile: str, retry: float = 0.25, timeout: float = 20.0
     ) -> None:
@@ -442,19 +429,18 @@ class Lock:
                 is_available = True
                 break
             except (IOError, OSError):
-                print('Lock not acquired; waiting')
-                time.sleep(self.retry) ## sleep the expected amount of time
+                print("Lock not acquired; waiting")
+                time.sleep(self.retry)  ## sleep the expected amount of time
                 curr_time = time.time()
 
-        if is_available: ## create the lockfile
-            print('File lock successfully acquired')
+        if is_available:  ## create the lockfile
+            print("File lock successfully acquired")
             self.filehandle = fh
         else:
-            print('Failed to obtain the block')
+            print("Failed to obtain the block")
             os.close(fh)
 
         return self.filehandle
-
 
     def __exit__(self, exc_type: Any, exc_value: Any, exc_tb: Any) -> None:
         if self.filehandle:
@@ -463,11 +449,12 @@ class Lock:
 
 
 class CommandLineManager:
-    __slots__ = ('v', 'logger')
+    __slots__ = ("v", "logger")
     """
     A minimal functionality class to be decorated with Click functionality and
     further extended to suit particular scripts' needs
     """
+
     def set_logging(self, name: str = __name__) -> None:
         """
         Sets up logging system for a TogaMain instance
@@ -478,22 +465,22 @@ class CommandLineManager:
         if self.logger.handlers:
             return
         self.logger.setLevel(logging.DEBUG)
-        if hasattr(self, 'log_file') and self.log_file:
+        if hasattr(self, "log_file") and self.log_file:
             file_handler: logging.FileHandler = logging.FileHandler(
-                self.log_file, mode='a', encoding=UTF8
+                self.log_file, mode="a", encoding=UTF8
             )
             file_handler.setFormatter(FORMATTER)
             self.logger.addHandler(file_handler)
-        if hasattr(self, 'v') and self.v:
+        if hasattr(self, "v") and self.v:
             console_handler: logging.StreamHandler = logging.StreamHandler()
             console_handler.setFormatter(FORMATTER)
             self.logger.addHandler(console_handler)
 
-    def _to_log(self, msg: str, level: str = 'info'):
+    def _to_log(self, msg: str, level: str = "info"):
         """
         Adds the message to the log
         """
-        if not hasattr(self, 'logger'):
+        if not hasattr(self, "logger"):
             return
         getattr(self.logger, level)(msg)
 
@@ -503,7 +490,7 @@ class CommandLineManager:
 
     def _stderr(self, msg: str) -> None:
         """Report a line to standard error stream regardless of verbosity settings"""
-        sys.stderr.write(msg + '\n')
+        sys.stderr.write(msg + "\n")
 
     def _exit(self, msg: str = None) -> None:
         """Safe exit witn zero return code and a given message"""
@@ -513,7 +500,7 @@ class CommandLineManager:
     def _die(self, msg: str = None) -> None:
         """Error-exit with a given message"""
         if msg is not None:
-            self._to_log(msg, 'critical')
+            self._to_log(msg, "critical")
         sys.exit(1)
 
     def _cp(self, from_: str, to_: str) -> None:
@@ -522,9 +509,9 @@ class CommandLineManager:
             copy2(from_, to_)
         except Exception as e:
             self._die(
-                (
-                    'Unexpected behavior when trying to copy from %s to %s: \n'
-                ) % (from_, to_) + e
+                ("Unexpected behavior when trying to copy from %s to %s: \n")
+                % (from_, to_)
+                + e
             )
 
     def _mkdir(self, d: str) -> None:
@@ -544,7 +531,7 @@ class CommandLineManager:
         except FileNotFoundError:
             pass
         except Exception:
-            self._die('Unexpected behaviour observed while trying to remove %s' % f)
+            self._die("Unexpected behaviour observed while trying to remove %s" % f)
 
     def _rmdir(self, d: str) -> None:
         """Recursive directory deletion method"""
@@ -574,19 +561,19 @@ class CommandLineManager:
         input_: bytes = None,
         die: bool = True,
         shun_verbosity: bool = True,
-        gather_stdout: bool = True
+        gather_stdout: bool = True,
     ) -> str:
         """Runs subprocesses, handles the exceptions"""
         ## TODO: Consider slowly moving to shell=False
         # if isinstance(cmd, str):
         #     cmd: List[str] = [x for x in cmd.split(' ') if x]
         pr: subprocess.Pipe = subprocess.Popen(
-            cmd, 
+            cmd,
             shell=True,
-            executable='bash',
+            executable="bash",
             stdin=subprocess.PIPE,
             stdout=subprocess.PIPE if gather_stdout else None,
-            stderr=subprocess.PIPE
+            stderr=subprocess.PIPE,
         )
         if self.v and not shun_verbosity:
             for line in pr.stdout:
@@ -596,10 +583,10 @@ class CommandLineManager:
         stdout, stderr = pr.communicate(input=input_)
         rc: int = pr.returncode
         if rc != 0:
-            err: str = stderr.decode('utf8')
+            err: str = stderr.decode("utf8")
             if not die:
                 return err
-            msg: str = f'{err_msg}:\n{err}'
+            msg: str = f"{err_msg}:\n{err}"
             self._die(msg)
         if gather_stdout:
-            return stdout.decode('utf8')
+            return stdout.decode("utf8")

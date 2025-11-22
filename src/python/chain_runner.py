@@ -5,29 +5,34 @@ Extract features from each chain to gene intersection.
 Loads a list of chain: genes tasks and calls
 modules.processor.unit for each chain: genes task.
 """
+
 # import argparse
 import os
 import sys
+
+from xgboost.core import Objective
 
 LOCATION: str = os.path.dirname(os.path.abspath(__file__))
 PARENT: str = os.sep.join(LOCATION.split(os.sep)[:-1])
 sys.path.extend([LOCATION, PARENT])
 
 from datetime import datetime as dt
-from modules.overlap_select import overlap_select
-from modules.common import bed_extract_id
-from modules.common import make_cds_track
-from modules.common import die
-from modules.common import load_chain_dict
-from modules.common import setup_logger
-from modules.common import to_log
-from modules.shared import CommandLineManager, CONTEXT_SETTINGS
 from typing import Any, Dict, List, Optional, Tuple, Union
+
 # from version import __version__
-
 import click
+from modules.common import (
+    bed_extract_id,
+    die,
+    load_chain_dict,
+    make_cds_track,
+    setup_logger,
+    to_log,
+)
+from modules.overlap_select import overlap_select
+from modules.shared import CONTEXT_SETTINGS, CommandLineManager
 
-__author__ = ('Bogdan M. Kirilenko', 'Yury V. Malovichko')
+__author__ = ("Bogdan M. Kirilenko", "Yury V. Malovichko")
 
 FLANK_SIZE: int = 10000  # gene flank size -> for flank ali feature
 COMBINED_BED_ID: str = "COMBINED"  # placeholder gene name for intermediate tracks
@@ -87,7 +92,9 @@ def bedcov_ranges(ranges, chrom, clipped: bool = False):
     Python re-implementation of bedCov (kent) functionality.
     """
     ranges_filtered, pointer = [ranges[0]], 0  # initial values for filter
-    gene = COMBINED_BED_ID if not clipped else COMBINED_CLIPPED_BED_ID  # if there is a mixture of genes - no ID anyway
+    gene = (
+        COMBINED_BED_ID if not clipped else COMBINED_CLIPPED_BED_ID
+    )  # if there is a mixture of genes - no ID anyway
     nested = False  # default value
     for i in range(1, len(ranges)):  # ranges are sorted so we can
         # compare each with only the next one
@@ -171,29 +178,28 @@ def collapse_exons(work_data, clipped: bool = False):
         block_starts,
         gene,
     )
-    nested_key: str = 'nested' if not clipped else 'clipped_nested'
+    nested_key: str = "nested" if not clipped else "clipped_nested"
     work_data[nested_key] = bed_12
 
 
 def make_chain_clipped_track(
     bed_line: str, chain_start: int, chain_end: int
 ) -> Tuple[str, int]:
-    """
-    """
-    data: List[str] = bed_line.rstrip().split('\t')
+    """ """
+    data: List[str] = bed_line.rstrip().split("\t")
     chain_start, chain_end = sorted((chain_start, chain_end))
     init_start: int = int(data[1])
     init_end: int = int(data[2])
     new_start: int = init_start
     new_end: int = init_end
-    data[3] = f'{data[3].replace("_CDS", "")}_chainclip'
+    data[3] = f"{data[3].replace('_CDS', '')}_chainclip"
     if init_start >= chain_start and init_end <= chain_end:
         exon_counter: int = int(data[9])
-        return '\t'.join(data), exon_counter
-    chrom_starts: List[int] = [int(x) for x in data[11].split(',') if x]
-    chrom_sizes: List[int] = [int(x) for x in data[10].split(',') if x]
-    new_exon_starts: str = ''
-    new_exon_sizes: str = ''
+        return "\t".join(data), exon_counter
+    chrom_starts: List[int] = [int(x) for x in data[11].split(",") if x]
+    chrom_sizes: List[int] = [int(x) for x in data[10].split(",") if x]
+    new_exon_starts: str = ""
+    new_exon_sizes: str = ""
     new_exon_counter: int = 0
     new_start_encountered: bool = False
     for i in range(len(chrom_starts)):
@@ -209,12 +215,12 @@ def make_chain_clipped_track(
         if not new_start_encountered:
             new_start = start
             new_start_encountered = True
-        new_exon_starts += f'{start - new_start},'
-        new_exon_sizes += f'{end - start},'
+        new_exon_starts += f"{start - new_start},"
+        new_exon_sizes += f"{end - start},"
     new_end = end
     if not new_exon_starts:
-        new_exon_starts = '0,'
-        new_exon_sizes = '0,'
+        new_exon_starts = "0,"
+        new_exon_sizes = "0,"
         new_end = new_start
     # print(f'{data[3]=}, {init_start=}, {init_end=}, {chain_start=}, {chain_end=}, {new_start=}, {new_end=}')
     data[1] = str(new_start)
@@ -224,7 +230,7 @@ def make_chain_clipped_track(
     data[9] = str(new_exon_counter)
     data[10] = new_exon_sizes
     data[11] = new_exon_starts
-    return '\t'.join(data), new_exon_counter
+    return "\t".join(data), new_exon_counter
 
 
 def make_grange_track(bed_line: str) -> str:
@@ -239,9 +245,12 @@ def make_grange_track(bed_line: str) -> str:
     # size of block == size of the gene
     grange_track[10] = str(int(grange_track[2]) - int(grange_track[1]))
     grange_track[9] = "1"  # it means that it will be only one block
-    return '\t'.join(grange_track)
+    return "\t".join(grange_track)
 
-def extend_bed_lines(bed_lines: str, chain_start: Optional[int] = None, chain_end: Optional[int] = None):
+
+def extend_bed_lines(
+    bed_lines: str, chain_start: Optional[int] = None, chain_end: Optional[int] = None
+):
     """Create bed tracks for overlapSelect."""
     bed_lines_extended = ""  # init the variable to store the extended bed lines
     cds2covered_exons: Dict[str, int] = {}
@@ -275,11 +284,13 @@ def extend_bed_lines(bed_lines: str, chain_start: Optional[int] = None, chain_en
         bed_lines_extended += cds_track + "\n"
 
         if chain_start is not None and chain_end is not None:
-            clipped_cds, exon_counter = make_chain_clipped_track(cds_track, chain_start, chain_end)
+            clipped_cds, exon_counter = make_chain_clipped_track(
+                cds_track, chain_start, chain_end
+            )
             cds2covered_exons[name] = exon_counter
-            bed_lines_extended += clipped_cds + '\n'
+            bed_lines_extended += clipped_cds + "\n"
             clipped_cds_range: str = make_grange_track(clipped_cds)
-            bed_lines_extended += clipped_cds_range + '\n'
+            bed_lines_extended += clipped_cds_range + "\n"
     # print(bed_lines_extended)
     return bed_lines_extended, cds2covered_exons
 
@@ -310,24 +321,26 @@ def extend_bed_lines(bed_lines: str, chain_start: Optional[int] = None, chain_en
 #     return out_dict
 
 
-def gene2clipped_spans(bed_lines: str, gene: str, start: int, stop: int) -> Tuple[int, int]:
+def gene2clipped_spans(
+    bed_lines: str, gene: str, start: int, stop: int
+) -> Optional[Tuple[int, int]]:
     """
     Reports the total exon and intron length confined between the two coordinates
     """
-    for line in bed_lines.split('\n'):
-        data: List[str] = line.rstrip().split('\t')
+    for line in bed_lines.split("\n"):
+        data: List[str] = line.rstrip().split("\t")
         if not data:
             continue
         name: str = data[3]
-        if name != f'{gene}_chainclip':
+        if name != f"{gene}_chainclip":
             continue
         # print(line.rstrip())
         cds_start: int = int(data[6])
         cds_end: int = int(data[7])
         start, stop = sorted((start, stop))
         total_span: int = min(stop, cds_end) - max(start, cds_start)
-        exon_sizes: List[int] = [int(x) for x in data[10].split(',') if x]
-        exon_starts: List[int] = [int(x) for x in data[11].split(',') if x]
+        exon_sizes: List[int] = [int(x) for x in data[10].split(",") if x]
+        exon_starts: List[int] = [int(x) for x in data[11].split(",") if x]
         total_exon_sum: int = 0
         for i in range(len(exon_sizes)):
             exon_start: int = cds_start + exon_starts[i]
@@ -338,19 +351,19 @@ def gene2clipped_spans(bed_lines: str, gene: str, start: int, stop: int) -> Tupl
                 continue
             exon_start = max(exon_start, start)
             exon_end = min(exon_end, stop)
-            total_exon_sum += (exon_end - exon_start)
+            total_exon_sum += exon_end - exon_start
         # print(f'{start=}, {stop=}, {cds_start=}, {cds_end=} {total_span=}')
         total_intron_sum: int = total_span - total_exon_sum
         return (total_exon_sum, total_intron_sum)
 
 
 def get_features(
-        work_data: Dict[str, Any], 
-        result: Dict[str, Any], 
-        bed_lines_extended: str,
-        cds2cov_exons: Dict[str, int], 
-        nested: bool = False
-    ) -> None:
+    work_data: Dict[str, Any],
+    result: Dict[str, Any],
+    bed_lines_extended: str,
+    cds2cov_exons: Dict[str, int],
+    nested: bool = False,
+) -> None:
     """Compute local exon overlap score.
 
     For every line in the bed file (X - exonic base, I - intronic base)
@@ -369,9 +382,13 @@ def get_features(
     ENSG00000167232_grange    chr17   0.0111  1       399     0.022   35952   399
     """
     # call overlap select
-    chain_glob_bases, local_exo_dict, bed_cov_times, clipped_query_len, covered_cds_range = overlap_select(
-        bed_lines_extended, work_data["chain"]
-    )
+    (
+        chain_glob_bases,
+        local_exo_dict,
+        bed_cov_times,
+        clipped_query_len,
+        covered_cds_range,
+    ) = overlap_select(bed_lines_extended, work_data["chain"])
     nums_of_cds_exons_covered = [
         len(v) for k, v in bed_cov_times.items() if k.endswith("_CDS")
     ]
@@ -381,7 +398,7 @@ def get_features(
     # gene2clipped_spans: Dict[str, Tuple[int, int]] = get_clipped_spans(bed_lines_extended)
     # compute for each gene finally
     chain_cds_bases = 0  # summarize global set here
-    clipped_chain_cds_bases: int = 0 ## summarize the same for 
+    clipped_chain_cds_bases: int = 0  ## summarize the same for
     # print(f'{local_exo_dict=}')
 
     for gene in work_data["genes"]:
@@ -433,19 +450,19 @@ def get_features(
         # print(f'{covered_cds_range=}')
         clipped_cov_exon, clipped_cov_intron = gene2clipped_spans(
             bed_lines_extended, gene, *covered_cds_range
-        )#gene2clipped_spans[gene]
+        )  # gene2clipped_spans[gene]
         # print(
         #     f'{gene=}, {clipped_cov_exon=}, {clipped_cov_intron=}, {blocks_v_exon_clip=}, {blocks_v_intron_clip=}, {blocks_v_chain_clip=}, {covered_cds_range=}'
         # )
         clipped_exon_fraction: float = (
-            blocks_v_exon_clip / clipped_cov_exon
-        ) if clipped_cov_exon else 0
+            (blocks_v_exon_clip / clipped_cov_exon) if clipped_cov_exon else 0
+        )
         if cds2cov_exons[gene] < 2:
             clipped_intron_fraction: float = -1.0
         else:
             clipped_intron_fraction: float = (
-                blocks_v_intron_clip / clipped_cov_intron
-            ) if clipped_cov_intron else 0
+                (blocks_v_intron_clip / clipped_cov_intron) if clipped_cov_intron else 0
+            )
         # print(f'{clipped_query_len=}, {blocks_v_chain_clip=}, {blocks_v_exon_clip=}, {clipped_cov_exon=}, {blocks_v_intron_clip=}, {clipped_cov_intron=}')
         result["exon_cov_clipped"] += f"{gene}={clipped_exon_fraction},"
         result["intron_cov_clipped"] += f"{gene}={clipped_intron_fraction},"
@@ -480,7 +497,9 @@ def get_features(
     # print(f'{clipped_query_len=}, {clipped_chain_cds_bases=}, {nested=}')
     # if COMBINED_BED_ID in local_exo_dict:
     #     print(f'{local_exo_dict[COMBINED_BED_ID]=}, {local_exo_dict[COMBINED_CLIPPED_BED_ID]=}')
-    clipped_chain_cds_bases = local_exo_dict[COMBINED_BED_ID] if nested else clipped_chain_cds_bases
+    clipped_chain_cds_bases = (
+        local_exo_dict[COMBINED_BED_ID] if nested else clipped_chain_cds_bases
+    )
     q_len_corrected = work_data["chain_QLen"] - chain_v_utr_exons
     assert (
         q_len_corrected >= 0
@@ -510,10 +529,10 @@ def extract_cds_lines(all_bed_lines, clipped: bool = False):
     for line in all_bed_lines.split("\n"):
         if line == "":
             continue
-        if line.split("\t")[3].endswith("_CDS" if not clipped else '_chainclip'):
+        if line.split("\t")[3].endswith("_CDS" if not clipped else "_chainclip"):
             selected.append(line)
     if not selected:
-        return ''
+        return ""
     return "\n".join(selected) + "\n"
 
 
@@ -534,7 +553,7 @@ def make_output(work_data, result, t0):
         result["chain_len"],
         result["Exlen_to_Qlen_chainclip"],
         result["exon_cov_clipped"],
-        result["intron_cov_clipped"]
+        result["intron_cov_clipped"],
     ]
     chain_output = "\t".join([str(x) for x in chain_fields]) + "\n"
     genes_output = "genes\t{0}\n".format("\t".join(result["gene_overlaps"]))
@@ -558,88 +577,77 @@ def extended_output(result, t0):
 
 ## TODO: Make it read a two-column file instead
 @click.command(context_settings=CONTEXT_SETTINGS, no_args_is_help=True)
-@click.argument(
-    'ref_hdf5',
-    type=click.Path(exists=True),
-    metavar='REF_HDF5'
-)
-@click.argument(
-    'chain_file',
-    type=click.Path(exists=True),
-    metavar='CHAIN_FILE'
-)
+@click.argument("ref_hdf5", type=click.Path(exists=True), metavar="REF_HDF5")
+@click.argument("chain_file", type=click.Path(exists=True), metavar="CHAIN_FILE")
 @click.option(
-    '--input_file',
-    '-i',
-    type=click.File('r', lazy=True),
-    metavar='INPUT_FILE',
+    "--input_file",
+    "-i",
+    type=click.File("r", lazy=True),
+    metavar="INPUT_FILE",
     default=None,
     show_default=True,
     help=(
-        'A tab-separated two-column file containing chain identifiers and '
-        'respective comma-separated lists of projected transcripts. Deprecates '
-        'the values provided with --chain_id and --transcripts options'
-    )
+        "A tab-separated two-column file containing chain identifiers and "
+        "respective comma-separated lists of projected transcripts. Deprecates "
+        "the values provided with --chain_id and --transcripts options"
+    ),
 )
 @click.option(
-    '--chain_id',
-    '-c',
+    "--chain_id",
+    "-c",
     type=str,
-    metavar='CHAIN_ID',
+    metavar="CHAIN_ID",
     default=None,
     show_default=True,
     help=(
-        'Id of the chain to analyse. Valid only if transcript list is provided '
-        'instead of the input file'
-    )
+        "Id of the chain to analyse. Valid only if transcript list is provided "
+        "instead of the input file"
+    ),
 )
 @click.option(
-    '--transcripts',
-    '-t',
+    "--transcripts",
+    "-t",
     type=str,
-    metavar='TRANSCRIPTS',
+    metavar="TRANSCRIPTS",
     default=None,
     show_default=True,
     help=(
-        'A comma-separated list of transcript to analyse. Valid only if chain ID '
-        'is provided instead of the input file'
-    )
+        "A comma-separated list of transcript to analyse. Valid only if chain ID "
+        "is provided instead of the input file"
+    ),
 )
 @click.option(
-    '--extended',
-    '-e',
+    "--extended",
+    "-e",
     is_flag=True,
     default=False,
     show_default=True,
     help=(
-        'If set, reports output in human-readable format; '
-        'recommended for standalone runs only'
-    )
+        "If set, reports output in human-readable format; "
+        "recommended for standalone runs only"
+    ),
 )
 @click.option(
-    '--output',
-    '-o',
-    type=click.File('a', lazy=True),
-    metavar='OUTPUT_FILE',
+    "--output",
+    "-o",
+    type=click.File("a", lazy=True),
+    metavar="OUTPUT_FILE",
     default=sys.stdout,
     show_default=False,
     help=(
         'A path to write the output to; the file is processed in the "add" mode '
-        '[default: stdout]'
-    )
+        "[default: stdout]"
+    ),
 )
 @click.option(
-    '--verbose',
-    '-v',
+    "--verbose",
+    "-v",
     is_flag=True,
     default=False,
     show_default=True,
-    help='Controls execution verbosity'
+    help="Controls execution verbosity",
 )
-
-
 class ChainRunner(CommandLineManager):
-
     """
     A module for extracting projection features.\n
     This is a legacy code from TOGA 1.0 with minimal reflavouring. A proper
@@ -658,9 +666,18 @@ class ChainRunner(CommandLineManager):
     """
 
     __slots__ = [
-        'ref_hdf5', 'chain_file', 'input_file', 'chain', 'transcripts',
-        'chain2trs', 'index_file', 'extended', 'output', 'v',
-        'chain_dict', 'logger'
+        "ref_hdf5",
+        "chain_file",
+        "input_file",
+        "chain",
+        "transcripts",
+        "chain2trs",
+        "index_file",
+        "extended",
+        "output",
+        "v",
+        "chain_dict",
+        "logger",
     ]
 
     def __init__(
@@ -672,7 +689,7 @@ class ChainRunner(CommandLineManager):
         transcripts: Union[str, None],
         extended: bool,
         output: click.File,
-        verbose: bool
+        verbose: bool,
     ) -> None:
         self.v: bool = verbose
         self.set_logging()
@@ -682,23 +699,23 @@ class ChainRunner(CommandLineManager):
         self.transcripts: Union[str, None] = transcripts
         self.chain2trs: Dict[str, List[str]] = {}
         self.check_input_consistency()
-        if ref_hdf5[-4:] != 'hdf5':
-            ref_hdf5 = '.'.join(ref_hdf5.split('.')[:-1]) + '.hdf5'
+        if ref_hdf5[-4:] != "hdf5":
+            ref_hdf5 = ".".join(ref_hdf5.split(".")[:-1]) + ".hdf5"
             if not os.path.isfile(ref_hdf5):
                 self._die(
-                    'Input reference annotation file is not an HDF5 instance '
-                    'and does not have an explicitly named HDF5 counterpart'
+                    "Input reference annotation file is not an HDF5 instance "
+                    "and does not have an explicitly named HDF5 counterpart"
                 )
             self.ref_hdf5: str = ref_hdf5
         else:
             self.ref_hdf5: str = ref_hdf5
         ## CREATE A CHAIN ATTRIBUTE
         self.chain_file: str = chain_file
-        index_file: str = chain_file + '_ID_position'
+        index_file: str = chain_file + "_ID_position"
         if not os.path.isfile(index_file):
             self._die(
-                'Chain file does not have a proper index or index file\'s name '
-                'differs from the expected template'
+                "Chain file does not have a proper index or index file's name "
+                "differs from the expected template"
             )
         self.index_file: str = index_file
         self.extended: bool = extended
@@ -715,35 +732,35 @@ class ChainRunner(CommandLineManager):
         """
         if self.chain is None and self.transcripts is None and self.input_file is None:
             self._die(
-                'No input was provided for chain_runner.py! Please provide either '
-                '--input_file or --chain_id AND --transcripts options'
+                "No input was provided for chain_runner.py! Please provide either "
+                "--input_file or --chain_id AND --transcripts options"
             )
         if self.input_file is not None:
             for line in self.input_file:
-                data: List[str] = line.strip().split('\t')
+                data: List[str] = line.strip().split("\t")
                 if not data:
                     continue
                 if len(data) != 2:
                     self._die(
-                        'Input file for chain_runner.py contains inconsistent '
-                        'number of columns. Please make sure that argument for '
-                        '--input_file contains two tab-separated columns'
+                        "Input file for chain_runner.py contains inconsistent "
+                        "number of columns. Please make sure that argument for "
+                        "--input_file contains two tab-separated columns"
                     )
                 chain: str = data[0]
-                trs: List[str] = [x for x in data[1].split(',') if x]
+                trs: List[str] = [x for x in data[1].split(",") if x]
                 if not trs:
                     self._die(
-                        'Input file for chain_runner.py contains no '
-                        f'transcripts for chain {chain}'
+                        "Input file for chain_runner.py contains no "
+                        f"transcripts for chain {chain}"
                     )
                 self.chain2trs[chain] = trs
             return
         if self.chain is None or self.transcripts is None:
             self._die(
-                'Either --chains or --transcripts were not provided. Please provide '
-                'values for both options or set --input_file instead'
+                "Either --chains or --transcripts were not provided. Please provide "
+                "values for both options or set --input_file instead"
             )
-        trs: List[str] = [x for x in self.transcripts.split(',') if x]
+        trs: List[str] = [x for x in self.transcripts.split(",") if x]
         self.chain2trs[chain] = trs
 
     def run(self) -> None:
@@ -764,7 +781,7 @@ class ChainRunner(CommandLineManager):
             results: Tuple[str, str, str] = self.extract_chain_features(chain, trs)
             ## write the results
             # self.output.write(''.join(results[:2]))
-            self.output.write(''.join(results))
+            self.output.write("".join(results))
 
     def extract_chain_features(
         self, chain: str, transcripts: List[str]
@@ -799,33 +816,33 @@ class ChainRunner(CommandLineManager):
             "Exlen_to_Qlen": 0,
             "Exlen_to_Qlen_chainclip": 0,
             "exon_cov_clipped": "",
-            "intron_cov_clipped": ""
+            "intron_cov_clipped": "",
         }
 
         ## populate :work_data: slots with respective values
-        work_data['chain_id'] = chain
-        work_data['bed'] = bed_extract_id(self.ref_hdf5, transcripts)
-        work_data['genes'] = [
-            x.split('\t')[3] for x in work_data['bed'].split('\n')[:-1]
-        ] ## TODO: Outstandingly ugly; rewrite
+        work_data["chain_id"] = chain
+        work_data["bed"] = bed_extract_id(self.ref_hdf5, transcripts)
+        work_data["genes"] = [
+            x.split("\t")[3] for x in work_data["bed"].split("\n")[:-1]
+        ]  ## TODO: Outstandingly ugly; rewrite
 
         ## check if data for all transcripts required were successfully extracted
-        if len(transcripts) != len(work_data['bed'].split("\n")[:-1]):
-            self._echo('Warning. Not all the transcripts were found!')
+        if len(transcripts) != len(work_data["bed"].split("\n")[:-1]):
+            self._echo("Warning. Not all the transcripts were found!")
             need_: int = len(transcripts)
-            extracted_: int = len(work_data['bed'].split('\n')[:-1])
-            self._echo(f'Expected {need_} transcripts, extracted {extracted_}')
-            missing_genes: str = ','.join(
-                [x for x in transcripts if x not in work_data['genes']]
+            extracted_: int = len(work_data["bed"].split("\n")[:-1])
+            self._echo(f"Expected {need_} transcripts, extracted {extracted_}")
+            missing_genes: str = ",".join(
+                [x for x in transcripts if x not in work_data["genes"]]
             )
-            self._echo(f'Missing transcripts:\n{missing_genes}')
+            self._echo(f"Missing transcripts:\n{missing_genes}")
 
         ## extract chain body from the file
-        work_data['chain'] = extract_chain(self.chain_file, self.chain_dict, chain)
+        work_data["chain"] = extract_chain(self.chain_file, self.chain_dict, chain)
 
         ## parse chain header
-        chain_header: List[str] = work_data['chain'].split('\n')[0].split()
-        t_strand: bool = chain_header[4] == '+'
+        chain_header: List[str] = work_data["chain"].split("\n")[0].split()
+        t_strand: bool = chain_header[4] == "+"
         q_start: int = int(chain_header[10])
         q_end: int = int(chain_header[11])
         t_start: int = int(chain_header[5])
@@ -837,19 +854,23 @@ class ChainRunner(CommandLineManager):
             t_end = t_size - t_start
             t_start = tstart
         q_len: int = abs(q_end - q_start)
-        work_data['chain_QLen'] = q_len
-        work_data['chain_Tstarts'] = int(chain_header[5])
-        work_data['chain_Tends'] = int(chain_header[6])
-        result['chain_global_score'] = int(chain_header[1])
-        result['chain_len'] = work_data['chain_Tends'] - work_data['chain_Tstarts']
+        work_data["chain_QLen"] = q_len
+        work_data["chain_Tstarts"] = int(chain_header[5])
+        work_data["chain_Tends"] = int(chain_header[6])
+        result["chain_global_score"] = int(chain_header[1])
+        result["chain_len"] = work_data["chain_Tends"] - work_data["chain_Tstarts"]
 
         ## computation part; to be modified
-        bed_lines_extended, cds2cov_exons = extend_bed_lines(work_data['bed'], t_start, t_end)
+        bed_lines_extended, cds2cov_exons = extend_bed_lines(
+            work_data["bed"], t_start, t_end
+        )
         cds_bed_lines = extract_cds_lines(bed_lines_extended)
         tot_track: str = get_tot_exons_track(work_data)
         bed_lines_extended += f"{tot_track}\n"
         # print(bed_lines_extended)
-        nested: bool = check_nest(work_data, cds_bed_lines)  # check if the genes are nested
+        nested: bool = check_nest(
+            work_data, cds_bed_lines
+        )  # check if the genes are nested
         # print(bed_lines_extended)
         clipped_cds_lines: str = extract_cds_lines(bed_lines_extended, clipped=True)
         # print(f'{clipped_cds_lines=}')
@@ -864,13 +885,15 @@ class ChainRunner(CommandLineManager):
             # another case, firstly need to make bed track with no intersections
             # and only after that call this function with flag NESTED for updated bed file
             collapse_exons(work_data)
-            if work_data['nested'] is not None:
+            if work_data["nested"] is not None:
                 bed_lines_extended += f"{work_data['nested']}\n"
             collapse_exons(work_data, clipped=True)
-            if work_data['clipped_nested'] is not None:
-                bed_lines_extended += f'{work_data["clipped_nested"]}\n'
+            if work_data["clipped_nested"] is not None:
+                bed_lines_extended += f"{work_data['clipped_nested']}\n"
             # print(bed_lines_extended)
-            get_features(work_data, result, bed_lines_extended, cds2cov_exons, nested=True)
+            get_features(
+                work_data, result, bed_lines_extended, cds2cov_exons, nested=True
+            )
         if self.extended:
             # provide extended output
             # human-readable version
@@ -879,9 +902,6 @@ class ChainRunner(CommandLineManager):
             # provide short version of output
             output = make_output(work_data, result, t0)
         return output
-
-
-
 
 
 if __name__ == "__main__":
