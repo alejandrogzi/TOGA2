@@ -1,3 +1,11 @@
+## v2.0.7
+* Postoga integration; standalone `postoga` mode + `postoga` table creation (`toga.table.gz`) for `run` mode
+* IntronIC classification for TOGA2 results added
+* Fixed `integrate` mode + help message
+* Updated local installation 
+* Support for batch managers in the containerized state
+* Conda support
+
 ## v2.0.6
 * New TOGA2 mode added: `integrate` (early access functionality)
 * Query gene inference improved:
