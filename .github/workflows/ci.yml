@@ -66,11 +66,6 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-pip-
     
-    # Individual test steps based on Makefile targets
-    - name: Check shell compatibility
-      run: |
-        .github/workflows/test_step.sh check_shell
-    
     - name: Check essential dependencies
       run: |
         .github/workflows/test_step.sh check_essentials

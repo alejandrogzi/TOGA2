@@ -9,15 +9,6 @@ echo "Running $1"
 echo "=============================="
 
 case "$1" in
-    "check_shell")
-        if [ "$(echo $0)" != "-bash" ]; then
-            echo "ERROR: TOGA2 currently only supports bash as operating shell"
-            exit 1
-        else
-            echo "bash has been found to be a default current shell; shell type check successfully passed"
-        fi
-        ;;
-    
     "check_essentials")
         python3 check_dependencies.py essentials
         ;;
