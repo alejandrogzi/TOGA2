@@ -1,0 +1,143 @@
+name: TOGA2 CI
+
+on:
+  push:
+    branches: [ main, master, develop ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        python-version: [3.9, '3.10', '3.11']
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+    
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          gcc \
+          g++ \
+          make \
+          wget \
+          curl \
+          git \
+          bash \
+          cargo \
+          rustc \
+          pkg-config \
+          libhdf5-dev \
+          python3-dev \
+          python3-pip
+    
+    - name: Cache Rust dependencies
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          src/rust/target
+          bed2gtf/target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+    
+    - name: Cache Python dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+    
+    - name: Install Python packages
+      run: |
+        python3 -m pip install --upgrade pip
+        python3 -m pip install -r requirements.txt
+    
+    - name: Make executable permissions
+      run: |
+        chmod +x check_dependencies.py
+        chmod +x toga2.py
+        chmod +x src/python/*.py
+        chmod +x src/python/modules/*.py
+    
+    - name: Check dependencies
+      run: |
+        python3 check_dependencies.py essentials
+        python3 check_dependencies.py managers
+    
+    - name: Build C components
+      run: |
+        mkdir -p bin
+        if [ "$(uname -m)" = "aarch64" ]; then \
+          CFLAGS="-Wall -Wextra -O2 -g -std=c99 -arch arm64"; \
+        else \
+          CFLAGS="-Wall -Wextra -O2 -g -std=c99"; \
+        fi; \
+        gcc $CFLAGS -o bin/chain_filter_by_id src/c/chain_filter_by_id.c
+        gcc $CFLAGS -fPIC -shared -o src/python/modules/chain_coords_converter_slib.so src/c/chain_coords_converter_slib.c
+        gcc $CFLAGS -fPIC -shared -o src/python/modules/chain_bst_lib.so src/c/chain_bst_lib.c
+    
+    - name: Download UCSC binaries
+      run: |
+        mkdir -p bin
+        wget -P bin/ http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64.v479/twoBitToFa
+        wget -P bin/ http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64.v479/faToTwoBit
+        wget -P bin/ http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64.v479/wigToBigWig
+        wget -P bin/ http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64.v479/bigWigToWig
+        wget -P bin/ http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64.v479/bigBedToBed
+        wget -P bin/ http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64.v479/bedToBigBed
+        wget -P bin/ http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64.v479/ixIxx
+        chmod +x bin/*
+    
+    - name: Build Cython components
+      run: |
+        mkdir -p bin
+        python3 setup.py build_ext --build-lib=src
+    
+    - name: Build Rust components
+      run: |
+        cd src/rust && cargo build --release
+        cd ../..
+        cd bed2gtf && cargo build --release
+    
+    - name: Build CESAR2.0
+      run: |
+        cd CESAR2.0 && make
+    
+    - name: Install postoga rustools
+      run: |
+        cd postoga/rustools
+        maturin develop --release
+    
+    - name: Train models
+      run: |
+        python3 src/python/train_model.py
+    
+    - name: Final integration test - TOGA2 help
+      run: |
+        ./toga2.py -h
+    
+    - name: Verify build artifacts
+      run: |
+        echo "Checking if binaries exist:"
+        ls -la bin/
+        echo "Checking if shared libraries exist:"
+        ls -la src/python/modules/*.so
+        echo "Checking if Rust binaries exist:"
+        ls -la src/rust/target/release/
+        ls -la bed2gtf/target/release/
