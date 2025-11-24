@@ -136,6 +136,7 @@ jobs:
         fi
 
         source toga2/bin/activate
+        rm -rf bin/
         
         make
         ./toga2.py -h
