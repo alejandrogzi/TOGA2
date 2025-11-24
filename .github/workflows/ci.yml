@@ -66,54 +66,66 @@ jobs:
         restore-keys: |
           ${{ runner.os }}-pip-
     
-    - name: Check essential dependencies
-      run: |
-        .github/workflows/test_step.sh check_essentials
-    
-    - name: Check package managers
-      run: |
-        .github/workflows/test_step.sh check_managers
-    
     - name: Set executable permissions
       run: |
-        .github/workflows/test_step.sh chmod
+        chmod +x check_dependencies.py
+        chmod +x toga2.py
+        chmod +x src/python/*.py
+        chmod +x src/python/modules/*.py
     
-    - name: Install Python packages
+    - name: Install Python packages in toga2 venv and postoga installation
       run: |
-        .github/workflows/test_step.sh install_python
+        if [ ! -d "toga2" ]; then
+          python3 -m venv toga2
+        fi
+        
+        source toga2/bin/activate
+        make install_python install_third_party install_postoga
+        
+        ./postoga/postoga.py -h
     
     - name: Install UCSC binaries
       run: |
-        .github/workflows/test_step.sh install_binaries
+        make install_binaries
     
     - name: Build C components
       run: |
-        .github/workflows/test_step.sh build_c
+        make build_c
     
     - name: Build Cython components
       run: |
-        .github/workflows/test_step.sh build_cython
+        make build_cython
     
     - name: Build Rust components
       run: |
-        .github/workflows/test_step.sh build_rust
+        make build_rust
     
     - name: Build CESAR2.0
       run: |
-        .github/workflows/test_step.sh build_cesar
+        make build_cesar
     
-    - name: Install postoga rustools
+    - name: Train models in toga2 venv
       run: |
-        .github/workflows/test_step.sh install_postoga
-    
-    - name: Train models
-      run: |
-        .github/workflows/test_step.sh train_models
+        source toga2/bin/activate
+        make train_models
     
     - name: Final integration test
       run: |
-        .github/workflows/test_step.sh final_test
+        if [ ! -d "toga2" ]; then
+          python3 -m venv toga2
+        fi
+
+        source toga2/bin/activate
+        
+        make
+        ./toga2.py -h
     
     - name: Verify build artifacts
       run: |
-        .github/workflows/test_step.sh verify_artifacts
+        echo "Checking if binaries exist:"
+        ls -la bin/
+        echo "Checking if shared libraries exist:"
+        ls -la src/python/modules/*.so
+        echo "Checking if Rust binaries exist:"
+        ls -la src/rust/target/release/
+        ls -la bed2gtf/target/release/
