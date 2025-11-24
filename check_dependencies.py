@@ -247,7 +247,7 @@ class IntronIcInstaller(Installer):
     def install() -> None:
         ## clone from github
         dest: str = os.path.join(os.path.dirname(__file__), "bin", "intronIC")
-        clone_cmd: str = f"git clone https://github.com/glarue/intronIC {dest}"
+        clone_cmd: str = f"git clone https://github.com/alejandrogzi/intronIC {dest}"
         pr: subprocess.Pipe = subprocess.Popen(clone_cmd, shell=True, stderr=subprocess.PIPE)
         if pr.returncode != 0:
             click.echo("Process died with the following error: %s" % pr.communicate()[1])
