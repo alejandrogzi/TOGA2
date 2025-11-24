@@ -258,11 +258,11 @@ class IntronIcInstaller(Installer):
         if minor_v > PKG_MAX_VERSION:
             versioneer: str = os.path.join(dest, "versioneer.py")
             sed_cmd: str = f"sed -i 's/SafeConfig/Config/g; s/readfp/read_file/g' {versioneer}"
-        pr: subprocess.Popen = subprocess.Popen(sed_cmd, shell=True, stderr=subprocess.PIPE)
-        _, stderr = pr.communicate()
-        if pr.returncode != 0:
-            click.echo("Process died with following error: %s" % stderr)
-            sys.exit(1)
+            pr: subprocess.Popen = subprocess.Popen(sed_cmd, shell=True, stderr=subprocess.PIPE)
+            _, stderr = pr.communicate()
+            if pr.returncode != 0:
+                click.echo("Process died with following error: %s" % stderr)
+                sys.exit(1)
 
     def name() -> str:
         return "intronIC"
