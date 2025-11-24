@@ -12,7 +12,7 @@ jobs:
     
     strategy:
       matrix:
-        python-version: [3.9, '3.10', '3.11']
+        python-version: ['3.10', '3.11']
     
     steps:
     - name: Checkout repository
@@ -41,7 +41,8 @@ jobs:
           pkg-config \
           libhdf5-dev \
           python3-dev \
-          python3-pip
+          python3-pip \
+          python3-venv
     
     - name: Cache Rust dependencies
       uses: actions/cache@v3
@@ -58,86 +59,66 @@ jobs:
     - name: Cache Python dependencies
       uses: actions/cache@v3
       with:
-        path: ~/.cache/pip
+        path: |
+          ~/.cache/pip
+          toga2/
         key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
         restore-keys: |
           ${{ runner.os }}-pip-
     
+    # Individual test steps based on Makefile targets
+    - name: Check shell compatibility
+      run: |
+        .github/workflows/test_step.sh check_shell
+    
+    - name: Check essential dependencies
+      run: |
+        .github/workflows/test_step.sh check_essentials
+    
+    - name: Check package managers
+      run: |
+        .github/workflows/test_step.sh check_managers
+    
+    - name: Set executable permissions
+      run: |
+        .github/workflows/test_step.sh chmod
+    
     - name: Install Python packages
       run: |
-        python3 -m pip install --upgrade pip
-        python3 -m pip install -r requirements.txt
+        .github/workflows/test_step.sh install_python
     
-    - name: Make executable permissions
+    - name: Install UCSC binaries
       run: |
-        chmod +x check_dependencies.py
-        chmod +x toga2.py
-        chmod +x src/python/*.py
-        chmod +x src/python/modules/*.py
-    
-    - name: Check dependencies
-      run: |
-        python3 check_dependencies.py essentials
-        python3 check_dependencies.py managers
+        .github/workflows/test_step.sh install_binaries
     
     - name: Build C components
       run: |
-        mkdir -p bin
-        if [ "$(uname -m)" = "aarch64" ]; then \
-          CFLAGS="-Wall -Wextra -O2 -g -std=c99 -arch arm64"; \
-        else \
-          CFLAGS="-Wall -Wextra -O2 -g -std=c99"; \
-        fi; \
-        gcc $CFLAGS -o bin/chain_filter_by_id src/c/chain_filter_by_id.c
-        gcc $CFLAGS -fPIC -shared -o src/python/modules/chain_coords_converter_slib.so src/c/chain_coords_converter_slib.c
-        gcc $CFLAGS -fPIC -shared -o src/python/modules/chain_bst_lib.so src/c/chain_bst_lib.c
-    
-    - name: Download UCSC binaries
-      run: |
-        mkdir -p bin
-        wget -P bin/ http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64.v479/twoBitToFa
-        wget -P bin/ http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64.v479/faToTwoBit
-        wget -P bin/ http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64.v479/wigToBigWig
-        wget -P bin/ http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64.v479/bigWigToWig
-        wget -P bin/ http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64.v479/bigBedToBed
-        wget -P bin/ http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64.v479/bedToBigBed
-        wget -P bin/ http://hgdownload.soe.ucsc.edu/admin/exe/linux.x86_64.v479/ixIxx
-        chmod +x bin/*
+        .github/workflows/test_step.sh build_c
     
     - name: Build Cython components
       run: |
-        mkdir -p bin
-        python3 setup.py build_ext --build-lib=src
+        .github/workflows/test_step.sh build_cython
     
     - name: Build Rust components
       run: |
-        cd src/rust && cargo build --release
-        cd ../..
-        cd bed2gtf && cargo build --release
+        .github/workflows/test_step.sh build_rust
     
     - name: Build CESAR2.0
       run: |
-        cd CESAR2.0 && make
+        .github/workflows/test_step.sh build_cesar
     
     - name: Install postoga rustools
       run: |
-        cd postoga/rustools
-        maturin develop --release
+        .github/workflows/test_step.sh install_postoga
     
     - name: Train models
       run: |
-        python3 src/python/train_model.py
+        .github/workflows/test_step.sh train_models
     
-    - name: Final integration test - TOGA2 help
+    - name: Final integration test
       run: |
-        ./toga2.py -h
+        .github/workflows/test_step.sh final_test
     
     - name: Verify build artifacts
       run: |
-        echo "Checking if binaries exist:"
-        ls -la bin/
-        echo "Checking if shared libraries exist:"
-        ls -la src/python/modules/*.so
-        echo "Checking if Rust binaries exist:"
-        ls -la src/rust/target/release/
-        ls -la bed2gtf/target/release/
+        .github/workflows/test_step.sh verify_artifacts
